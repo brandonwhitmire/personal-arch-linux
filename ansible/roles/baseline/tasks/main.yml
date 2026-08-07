@@ -1,0 +1,241 @@
+---
+- name: Enable pacman options
+  become: true
+  ansible.builtin.replace:
+    backup: true
+    path: /etc/pacman.conf
+    regexp: '#\s*({{ item }}.*)'
+    replace: '\1'
+  loop:
+    - VerbosePkgLists  # show from->to version and download/upgrade sizes
+    - ParallelDownloads  # download more pkgs at concurrently
+
+- name: Update Arch Linux keyring
+  become: true
+  ansible.builtin.package:
+    name: archlinux-keyring
+    state: present
+
+- name: Check system update status and perform if needed
+  block:
+    - name: Check if system was recently updated
+      become: true
+      ansible.builtin.stat:
+        path: /var/log/pacman.log
+      register: baseline_pacman_log_stat
+
+    - name: Get last system update time from pacman log
+      become: true
+      ansible.builtin.shell: |
+        set -o pipefail
+        if [ -f /var/log/pacman.log ]; then
+          # Get the last line that contains "starting full system upgrade" or "upgraded"
+          last_upgrade=$(grep -E "(starting full system upgrade|upgraded)" /var/log/pacman.log | tail -1)
+          if [ -n "$last_upgrade" ]; then
+            # Extract timestamp from the first field and remove brackets
+            timestamp=$(echo "$last_upgrade" | awk '{print $1}' | sed 's/\[//;s/\]//')
+            date -d "$timestamp" +%s 2>/dev/null || echo "0"
+          else
+            echo "0"
+          fi
+        else
+          echo "0"
+        fi
+      register: baseline_last_upgrade_epoch
+      changed_when: false
+
+    - name: Calculate time since last update
+      ansible.builtin.set_fact:
+        baseline_time_since_update: "{{ (ansible_facts.date_time.epoch | int) - (baseline_last_upgrade_epoch.stdout | int) }}"
+
+    - name: Set update needed flag based on time since last update
+      ansible.builtin.set_fact:
+        baseline_update_needed: "{{ (baseline_time_since_update | int) > 604800 }}"  # 1 week
+
+    - name: Debug update status
+      ansible.builtin.debug:
+        msg: "{{ '[!] Update needed' if baseline_update_needed else 'Not updating...' }} ({{ baseline_time_since_update }} seconds since last update)"
+
+    - name: Upgrade system
+      become: true
+      ansible.builtin.package:
+        update_cache: true
+        upgrade: true
+      register: baseline_upgrade_result
+      when: baseline_update_needed
+
+    - name: Reboot the VM
+      become: true
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+        connect_timeout: 60
+        post_reboot_delay: 15
+        test_command: uptime
+      when: baseline_update_needed and baseline_upgrade_result is defined and baseline_upgrade_result.changed
+
+- name: Remove conflicting acpilight and xorg-xbacklight packages if present
+  become: true
+  ansible.builtin.package:
+    name:
+      - acpilight
+      - xorg-xbacklight
+    state: absent
+  failed_when: false
+
+- name: Install baseline pkgs
+  become: true
+  ansible.builtin.package:
+    name:
+      - xdg-user-dirs  # common user dirs
+      - xorg-xinit  # start GUI
+      - xorg-server  # Xorg server
+      # - xorg-apps  # Xorg apps (excluded to avoid xorg-xbacklight conflict)
+      - xorg-xrandr  # display configuration
+      - xorg-xset  # user preference utility
+      - xorg-xsetroot  # root window parameter utility
+      - xorg-xprop  # property displayer
+      - xorg-xdpyinfo  # display information utility
+      - xorg-xwininfo  # window information utility
+      - xorg-xev  # event viewer
+      - xorg-xkill  # kill a client by its X resource
+      - xorg-xlsclients  # list client applications
+      - xorg-xlsfonts  # list fonts
+      - xorg-xmessage  # display a message
+      - xorg-xmodmap  # utility for modifying keymaps
+      - xorg-xrdb  # X server resource database utility
+      - xorg-xrefresh  # refresh all or part of an X screen
+      - xorg-xvinfo  # print out X-Video extension adaptor information
+      - xorg-xwd  # dump an image of an X window
+      - xorg-xwud  # display an X window dump
+      - xterm  # default terminal
+      - ttf-bitstream-vera  # serif and mono
+      - ttf-dejavu  # Bitstream Vera modified w/more Unicode
+      - ttf-croscore  # Helvetica, Times, and Courier
+      - noto-fonts-emoji  # comprehensive emoji support
+      - xss-lock  # xorg locker
+      - polkit  # privs management
+      - dmidecode  # used for checking for virtualization
+      - firefox  # web browser
+      - chromium  # web browser
+      - gedit  # text editor
+      - flameshot  # screenshot
+      - pkgfile  # pkg search from repos
+      - strace  # debugger
+      - bind-tools  # domain resolving
+      - udisks2  # disk mounting
+      - arandr  # desktop display configurator
+      - base-devel  # meta package for compiling (e.g. AUR)
+      - git  # repos
+      - python  # Python3
+      - python-pip  # pip package installer
+      - python-setuptools  # Python3 setuptools
+      - numlockx  # numlock on at login
+      - ghostwriter  # Markdown editor
+      - hunspell-en_us  # English spellcheck (for ghostwriter)
+      # - libreoffice-still  # office suite of programs
+      - pulseaudio  # PulseAudio
+      - pavucontrol  # PulseAudio GUI for volume
+      - vlc  # multimedia player
+      - packer  # automate VM building
+      - man-db  # manpages program
+      - man-pages  # actual manpages
+      - blueman  # Bluetooth
+      - dialog  # for wifi-menu
+      - netctl  # dep for wifi-menu
+      - pcmanfm  # file explorer GUI
+      - gvfs  # dep for pcmanfm features
+      - unzip  # zip
+      - evince  # PDF viewer
+      - reflector  # update pacman mirrors
+      - bluez  # bluetooth
+      - bluez-utils  # bluetooth utils
+      - pulseaudio-bluetooth  # pulseaudio dep for bluetooth
+      - xf86-input-synaptics  # touchpad
+      - android-file-transfer  # access files from Android device
+      - linux-headers  # Linux kernel headers
+    state: present
+
+- name: Enable bluetooth service
+  become: true
+  ansible.builtin.systemd:
+    name: bluetooth
+    enabled: true
+    state: started
+    daemon_reload: false
+
+- name: Enable and start the pkgfile timer
+  become: true
+  ansible.builtin.systemd:
+    name: pkgfile-update.timer
+    state: started
+    enabled: true
+    daemon_reload: false
+
+- name: Disable bluetooth on boot
+  become: true
+  vars:
+    bluetooth_enabled: 'false'
+  ansible.builtin.lineinfile:
+    backup: true
+    backrefs: true
+    path: /etc/bluetooth/main.conf
+    regexp: '^#\s*(AutoEnable)=.*$'
+    line: '\1={{ bluetooth_enabled }}'
+    state: present
+
+- name: Set default systemd service timeout
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/systemd/system.conf
+    marker: "# {mark} systemd_timeout"
+    create: true
+    state: present
+    mode: '0644'
+    block: |
+      DefaultTimeoutStopSec=15s
+
+- name: Configure power button behavior - ignore single press, shutdown on long press
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/logind.conf
+    regexp: '^#?\s*{{ item.key }}=.*'
+    line: '{{ item.key }}={{ item.value }}'
+    state: present
+    backup: true
+  loop:
+    - { key: 'HandlePowerKey', value: 'ignore' }
+    - { key: 'HandlePowerKeyLongPress', value: 'poweroff' }
+  notify: restart systemd-logind
+
+# https://wiki.archlinux.org/title/Touchpad_Synaptics#Frequently_used_options
+- name: Configure touchpad to use sane defaults
+  become: true
+  ansible.builtin.copy:
+    remote_src: false
+    src: files/70-synaptics.conf
+    dest: /etc/X11/xorg.conf.d/
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Change default sudo prompt timeout
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/sudo_prompt_timeout
+    line: Defaults timestamp_timeout=15
+    create: true
+    validate: 'visudo --check --strict --file=%s'
+    mode: '0440'
+    owner: root
+    group: root
+    state: present
+
+- name: Install font configuration for emoji support
+  become: true
+  ansible.builtin.copy:
+    force: true
+    src: files/fonts.conf
+    dest: /etc/fonts/local.conf
+    mode: '0644'
+    owner: root
+    group: root

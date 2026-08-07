@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Terminate already running bar instances
+killall -q polybar
+
+# Wait until the processes have been shut down
+while pgrep -u $UID -x polybar >/dev/null; do sleep 1; done
+
+# Detect bar name from config file
+# Look for [bar] or [bar/name] pattern
+# If [bar/name], use "name", if [bar], use "bar"
+BAR_LINE=$(grep -E "^\[bar" ~/.config/polybar/config.ini 2>/dev/null | head -1)
+if [ -n "$BAR_LINE" ]; then
+    # Extract bar name: [bar/name] -> name, [bar] -> bar
+    if echo "$BAR_LINE" | grep -q "/"; then
+        # Has slash, extract part after slash
+        BAR_NAME=$(echo "$BAR_LINE" | sed 's/.*\[bar\///;s/\].*//' | tr -d '[:space:]')
+    else
+        # No slash, use "bar"
+        BAR_NAME="bar"
+    fi
+else
+    # No bar section found, default to "main"
+    BAR_NAME="main"
+fi
+
+# Get primary monitor, or first connected monitor if no primary is set
+PRIMARY_MONITOR=$(xrandr --query 2>/dev/null | grep " connected" | grep " primary" | awk '{print $1}' | head -1)
+
+# If no primary monitor found, use the first connected monitor
+if [ -z "$PRIMARY_MONITOR" ]; then
+    PRIMARY_MONITOR=$(xrandr --query 2>/dev/null | grep " connected" | awk '{print $1}' | head -1)
+fi
+
+# Launch polybar on primary monitor only
+if [ -n "$PRIMARY_MONITOR" ]; then
+    MONITOR="$PRIMARY_MONITOR" polybar "$BAR_NAME" &
+fi

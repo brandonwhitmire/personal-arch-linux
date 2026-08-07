@@ -1,0 +1,25 @@
+---
+# dunst role - notification daemon with Dracula dark theme
+# This role installs and configures dunst with the Dracula dark theme
+
+- name: Install dunst package
+  become: true
+  ansible.builtin.package:
+    name:
+      - dunst  # system notifications
+    state: present
+
+- name: Ensure dunst config directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/dunst/
+    state: directory
+    mode: '0755'
+
+- name: Create dunst config with Dracula dark theme
+  become: false
+  ansible.builtin.template:
+    src: dunstrc.j2
+    dest: ~/.config/dunst/dunstrc
+    mode: '0644'
+    backup: true

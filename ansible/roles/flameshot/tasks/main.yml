@@ -1,0 +1,23 @@
+---
+- name: Install flameshot package
+  become: true
+  ansible.builtin.package:
+    name:
+      - flameshot
+    state: present
+
+- name: Ensure flameshot config directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/flameshot/
+    state: directory
+    mode: '0755'
+
+- name: Fix flameshot v14 xdg-portal hang on X11 (use legacy capture path)
+  become: false
+  community.general.ini_file:
+    path: ~/.config/flameshot/flameshot.ini
+    section: General
+    option: useX11LegacyScreenshot
+    value: "true"
+    mode: '0644'

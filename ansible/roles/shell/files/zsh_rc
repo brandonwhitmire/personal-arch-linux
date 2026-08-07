@@ -1,0 +1,579 @@
+# Set Starship ZSH as a prompt
+eval "$(starship init zsh)"
+
+# --- Powerline Fonts
+
+# https://wiki.archlinux.org/title/Powerline#Zsh
+export USE_POWERLINE="true"
+powerline-daemon --quiet
+. /usr/share/powerline/bindings/zsh/powerline.zsh
+
+# --- zsh Shell Options
+
+# https://wiki.archlinux.org/title/Zsh#Fish-like_syntax_highlighting_and_autosuggestions
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+source /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh
+
+# https://wiki.archlinux.org/title/Zsh#pacman_-F_%22command_not_found%22_handler
+function command_not_found_handler {
+    [[ -e '/var/lib/pacman/sync/core.files' ]] || sudo pacman -F --refresh  # update database cache if missing
+    local purple='\e[1;35m' bright='\e[0;1m' green='\e[1;32m' reset='\e[0m'
+    printf '❌ zsh: command not found: %s\n' "$1"
+    local entries=(
+        ${(f)"$(/usr/bin/pacman -F --machinereadable -- "/usr/bin/$1")"}
+    )
+    if (( ${#entries[@]} ))
+    then
+        printf "💡 ${bright}$1${reset} may be found in the following packages:\n"
+        local pkg
+        for entry in "${entries[@]}"
+        do
+            # (repo package version file)
+            local fields=(
+                ${(0)entry}
+            )
+            if [[ "$pkg" != "${fields[2]}" ]]
+            then
+                printf "${purple}%s/${bright}%s ${green}%s${reset}\n" "${fields[1]}" "${fields[2]}" "${fields[3]}"
+            fi
+            printf '    /%s\n' "${fields[4]}"
+            pkg="${fields[2]}"
+        done
+    fi
+    return 127
+}
+
+# Shell options
+setopt dotglob 	# shell expands '*' for dotfiles
+setopt append_history # append rather then overwrite
+setopt extended_history # save timestamp
+#setopt share_history # share history between terminals
+export HISTFILE=~/.zsh_history
+export SAVEHIST=10000
+
+# --- Wrapped Commands
+
+alias rg='rg --hidden --ignore-case --color auto'
+alias fd='fd --hidden --no-ignore'
+
+alias cp="cp --interactive --verbose" # confirm before overwriting something
+alias df='df --human-readable' # human-readable sizes
+alias du="du --total --human-readable"
+alias free='free --mebi' # show sizes in mebibytes
+alias np='nano --nowrap PKGBUILD'
+alias more='less'
+alias mkdir='mkdir --parents --verbose'
+alias mv='mv --interactive --verbose'
+alias ln='ln --interactive --verbose'
+alias rm='gio trash' # safely "delete" things into Trash:
+alias chown='chown --preserve-root'
+alias chmod='chmod --preserve-root'
+alias chgrp='chgrp --preserve-root'
+alias killall="killall --verbose"
+alias jobs="jobs -l" # no long option for "-l"
+alias exif_view="exiftool"
+alias exif_strip_metadata="exiftool -all="
+alias open="xdg-open"
+
+# some options in "ls" do not have long name versions
+alias ls='ls -C --color=auto' # normal
+alias ll='ls -l --all --classify --color=auto' # long-listing
+alias lt='ls -l -t -all --reverse --human-readable --size -1 --classify --color=auto' # time-sorted
+alias l='ls -l -S --all --reverse --classify --color=auto' # size-sorted
+alias ping="ping -c 1" # no long option for "-c"
+alias diff="colordiff --side-by-side --suppress-common-lines"
+alias pdf="evince"
+
+#alias vi="$EDITOR"
+#alias vim="$EDITOR"
+alias vi="nvim"
+alias vim="nvim"
+
+alias update-grub="sudo grub-mkconfig --output=/boot/grub/grub.cfg"
+
+# --- New Commands 
+
+# BSD syntax to show every process
+alias psg="ps aux | grep --invert-match 'grep' | grep --ignore-case --regexp 'VSZ' --regexp"
+alias nsg="ss --all --numeric --tcp --udp --processes | grep --invert-match 'grep' | grep --ignore-case --regexp 'Netid' --regexp"
+
+alias cpv='rsync --archive --human-readable --info=progress2'
+alias hazip="curl --silent https://wtfismyip.com/text"
+alias hazip_adv="curl --silent https://wtfismyip.com/json"
+alias dl="cdd $(xdg-user-dir DOWNLOAD)"
+alias trash="gio list Trash:"
+alias path='echo -e ${PATH//:/\\n}' # no long option for "-e"
+alias now='date +"%d-%m-%Y %T"'
+alias iptlist='sudo iptables --verbose --numeric --list --line-numbers'
+alias browser="$BROWSER"
+alias reload_background="nitrogen --restore &"
+
+# --- Functions
+
+# Burn ISO 9660 files (liveboots) to devices
+# TODO: add more safety checks and confirm device before write
+iso_burn () {
+    LIVEBOOT_ISO="${1}"
+    TARGET_DEVICE="${2}"
+
+    if [[ ! -e "$LIVEBOOT_ISO" ]] ; then
+        echo "Liveboot ISO (9660) file does not exist!: $1"
+        exit 1
+    fi
+
+    echo "Pausing for dramatic effect..."
+    sleep 7
+
+    dd \
+        bs=32M \
+        conv=fsync \
+        oflag=direct \
+        status=progress \
+        if="${1}" \
+        of="${2}"
+}
+
+# Show trashcan
+trashcan () {
+    nohup xdg-open $HOME/.local/share/Trash/files > /dev/null 2>&1 &
+}
+
+# Install packages properly
+install () {
+	if [[ -z "$1" ]] ; then
+		echo "Please supply a package(s) to INSTALL!"
+		exit 1
+	fi
+	echo -e "[i] Trying official repos"
+    sudo pacman -S "$@" ||
+        echo -e "[E] Official repos failed\n\n[i] Trying AUR" &&
+        yay -S "$@"
+}
+# Removes packages and dependencies (not used by other packages)
+uninstall () {
+    if [[ -z "$1" ]] ; then
+        echo "Please supply a package(s) to UNINSTALL!"
+        exit 1
+    fi
+	sudo pacman -R --recursive --unneeded "$@"
+}
+# Remove unused dependencies
+remove_unused_dependecies () {
+	sudo pacman -R $(pacman -Q --deps --unrequired --quiet)
+}
+# Install AUR packages via yay
+install_yay () {
+	if [[ -z "$1" ]] ; then
+		echo "Please supply a package(s) to INSTALL!"
+		exit 1
+	fi
+	yay -S "$@"
+}
+yinstall () {
+	install_yay "$@"
+}
+# Removes AUR packages and dependencies (not used by other packages)
+uninstall_yay () {
+    if [[ -z "$1" ]] ; then
+        echo "Please supply a package(s) to UNINSTALL!"
+        exit 1
+    fi
+	yay -R --recursive --unneeded "$@"
+}
+yuninstall () {
+	uninstall_yay "$@"
+}
+# Show full system information
+systeminfo () {
+	# Ref: https://forum.manjaro.org/t/howto-provide-system-information/874
+	clear
+  export LANG=C
+	screenfetch
+	inxi --admin --verbosity=7 --filter --width
+}
+sysinfo () {
+	systeminfo
+}
+# Spawn new terminal
+# NOTE: default options are for alacritty terminal
+newterm () {
+	# Use $CWD by default
+	if [[ -z "$1" ]] ; then
+		DIRECTORY="$(pwd)"
+	# if $1 is supplied, use that location instead
+	else
+		DIRECTORY="$1"
+	fi
+	nohup "$TERMINAL" --working-directory "$DIRECTORY" > /dev/null 2>&1 &
+}
+# Kernel Ring Buffer logs for hardware errors (only emergency, alert, critical, error, and warning messages)
+logs_kernel () {
+	sudo dmesg --level emerg,alert,crit,err,warn
+}
+# systemd logs (of a particular priority)
+logs_systemd () {
+	journalctl --catalog --priority=3 --boot=-1
+}
+# systemd current logs (followed)
+logs_follow_systemd () {
+	journalctl --follow
+}
+# Show current used GPU
+gpu-used () {
+	glxinfo | grep 'server glx vendor string'
+	envycontrol --query
+}
+# Switch GPU to Nvidia (more powerful, discrete GPU)
+gpu-nvidia () {
+	gpu-used
+	envycontrol --switch nvidia --force
+}
+# Switch GPU to Intel (less powerful, integrated GPU)
+gpu-integrated () {
+	gpu-used
+	envycontrol --switch integrated --force
+}
+# EZ block device mounting
+ez_mount () {
+	if [[ -z "$1" ]] ; then
+        udisksctl mount --block-device "$1"
+    fi
+    udisksctl status
+}
+# EZ block device unmounting
+ez_unmount () {
+	if [[ -z "$1" ]] ; then
+        udisksctl unmount --block-device "$1"
+    fi
+    udisksctl status
+}
+# Mount LUKS device
+# $1: UUID of harddrive (obtain via "sudo fdisk -l")
+# $2: name to crypt open as
+mount_luks_device () {
+	# Help menu
+	if [[ "$1" == "-h" ]] ; then
+		echo -e "Usage:\t$0 UUID crypt_device_name"
+		echo -e "\t$0 \"58ea1ec5-1654-4d85-92bd-e093f0a1439b\" crypt_harddrive"
+		return 100
+	fi
+
+	# Use preloaded variables
+	if [[ -z "$1" || -z "$2" ]] ; then
+		UUID="eb3382b7-477b-4e93-a103-e4269ec5d0b3"
+		NAME="crypt_hdd"
+		echo "CLI arguments not used..."
+		echo -e "\tUUID: $UUID"
+		echo -e "\tNAME: $NAME"
+	# Use CLI arguments
+	else
+		UUID="$1"
+		NAME="$2"
+	fi
+	# ---
+	DEVICE=$(lsblk --raw --output NAME,UUID | grep "$UUID" | cut --delimiter ' ' --fields 1 )
+
+	if [[ -z "$UUID" || -z "$DEVICE" || -z "$NAME" ]] ; then
+		echo "These cannot be empty!"
+		echo -e "\tUUID: $UUID"
+		echo -e "\tDEVICE: $DEVICE"
+		echo -e "\tNAME: $NAME"
+		return 1
+	fi
+
+	# Check if LUKS device mounted
+	udisksctl info --block-device /dev/mapper/"$NAME" > /dev/null 2>&1
+	RET_CODE="$?"
+
+	# Device not mounted ; so mount
+	if [[ "$RET_CODE" == "1" ]] ; then
+    echo "Opening cryptdevice"
+    sudo cryptsetup open "/dev/$DEVICE" "$NAME"
+		echo "MOUNTING..."
+		MOUNT=$(udisksctl mount --block-device /dev/mapper/"$NAME")
+		echo "$MOUNT"
+		ll $(echo "$MOUNT" | awk -F ' ' '{print $NF}')
+	# Device already mounted ; so unmount
+	elif [[ "$RET_CODE" == "0" ]] ; then
+    read -q "ANSWER?Do you want to unmount? [y/n]: "
+    if [[ "$ANSWER" =~ ^[Yy]$ ]] ; then
+      echo "UNMOUNTING..."
+      udisksctl unmount --block-device /dev/mapper/"$NAME"
+      echo "Closing cryptdevice..."
+      sudo cryptsetup close "$NAME"
+    else
+      echo "[!] Aborted unmount"
+    fi
+	# Error
+	else
+		echo "CRITICAL ERROR!"
+		echo "Return code: $RET_CODE"
+		return 2
+	fi
+}
+# Encrypted, de-duplicated, & compressed backups
+borg_backup () {
+	REPO_BORG="/run/media/obb/nix_hdd/borg_backup"
+	TODAY="$(date +%Y-%m-%d)"
+
+	# Create/intialize backup
+	# sudo borg --verbose init --encryption=repokey-blake2 "$REPO_BORG"
+
+	# borg program ENVs
+	export BORG_RELOCATED_REPO_ACCESS_IS_OK=no
+	export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no
+
+	# ---
+
+	# Ensure repo directory is there exists
+	if [[ ! -d "$REPO_BORG" ]] ; then
+		echo "ERROR finding the repo: >>$REPO_BORG<<"
+		return 1
+	fi
+
+    # Useful for manual backups or new name (to backup more than once/day)
+	if [[ -z "$1" ]] ; then
+		EXTRA_TAG="auto"
+	else
+		EXTRA_TAG="$1"
+	fi
+
+	# ---
+
+	borg --version
+    BREAKLINE
+	echo $TODAY
+    BREAKLINE
+
+    # NOTE: sudo required for reading "/etc"
+	sudo borg \
+        create \
+        --progress \
+        --stats \
+        --compression auto,lzma \
+        --comment "Autobackup: $TODAY" \
+        --exclude '*.img' \
+        --exclude '*.iso' \
+        --exclude '*.ova' \
+        --exclude '*.vdi' \
+        --exclude '*.vmdk' \
+        --exclude '*box' \
+		--exclude '*.qcow2' \
+        --exclude $HOME/.local \
+        --exclude $HOME/.cache \
+        --exclude $HOME/.vagrant.d \
+        --exclude $HOME/.wine \
+        --exclude $HOME/.yarn \
+        --exclude $HOME/.npm \
+        --exclude $HOME/.gem \
+        --exclude $HOME/.config/chromium \
+        $REPO_BORG::${TODAY}_${EXTRA_TAG} \
+        /etc \
+        $HOME
+
+	# Finish buffering anything from memory to disk
+	sync
+}
+update_no_backup () {
+    echo "[i] Updating packages..."
+    sudo pacman -S --refresh --sysupgrade
+    yay -S --refresh --sysupgrade
+    grep "upgraded qt5-base" /var/log/pacman.log | grep -q "$(date +%Y-%m-%d)" && yay -S qt5-styleplugins --rebuild
+}
+# Perform system update properly
+update () {
+	BREAKLINE
+	echo "[i] Backing up..."
+	BREAKLINE
+	mount_luks_device
+	BREAKLINE
+	borg_backup "$1"
+	BREAKLINE
+	update_no_backup
+	BREAKLINE
+}
+# Update pacman mirrors
+# Reference: https://xyne.dev/projects/reflector/
+: "${ARCH_MIRROR_COUNTRY:=MX,US}"
+update_mirrors () {
+    echo "[i] Updating package mirrors..."
+    sudo reflector \
+        --country "${ARCH_MIRROR_COUNTRY}" \
+        --ipv4 \
+        --latest 10 \
+        --completion-percent 100 \
+        --protocol https \
+        --sort rate \
+        --threads 5 \
+        --save /etc/pacman.d/mirrorlist
+    echo -e "\n[i] Every run of pacman-mirrors requires you to syncronize your database and update your system\n"
+    sudo pacman -S --refresh --sysupgrade
+}
+# Create and switch to new, random temp directory
+mkt () {
+	cd $(mktemp --directory)
+}
+# Switch to and list a directory
+cdd () {
+	if [[ ! -z "$!" ]] ; then
+		cd $1
+	fi
+	ll
+}
+# ASCII line break of '=' chars by default or $1 arg supplied
+BREAKLINE () {
+    if [[ -z "$1" ]] ; then
+            CHAR="="
+    else
+            CHAR="$1"
+    fi
+
+    printf "$CHAR%.0s" {1..80} ; echo
+}
+# Search with locate
+search () {
+	echo -e "Don't forget to update:\n\tsudo updatedb"
+	locate "*$@*"
+}
+# Clean shell history
+clean_histfile () {
+	[[ -z "$1" ]] && (echo 'ERROR: Missing argument "$1" to clean out' ; exit 1)
+	echo "Cleaning regex \"$1\" out of history: $HISTFILE"
+	sed --in-place "/^.*$1.*$/d" "$HISTFILE"
+}
+# Python3 pprint a file (e.g. JSON)
+pprint () {
+	if [[ -z "$1" ]] ; then
+		echo "Please supply a filename to print!"
+		exit 1
+	fi
+	echo -e "import pprint\nwith open('$1', 'rt') as file_obj: pprint.pprint(file_obj.readlines())" | python3
+}
+# Force screen on ; wait ; screen off
+# NOTE: wake screen via keyboard or mouse
+screen_off () {
+	xset dpms force on
+	sleep 0
+	xset dpms force off
+}
+wifi_enable () {
+    echo '[i] Enabling wifi...'
+    sudo rfkill unblock wifi
+    rfkill list
+}
+
+wifi_disable () {
+    echo '[i] Disabling wifi...'
+    sudo rfkill block wifi
+    rfkill list
+}
+
+wifi_scan () {
+    echo '[i] This will *NOT* enable wifi automatically...'
+    nmcli device wifi rescan && \
+        nmcli device wifi list && \
+        echo '[i] Connect via:' && \
+        echo '    nmcli device wifi connect <WIFI_NAME>'
+}
+
+# FZF: fuzzy finder bindings and completions
+source /usr/share/fzf/key-bindings.zsh
+source /usr/share/fzf/completion.zsh
+
+# Ruby Gem defaults
+export GEM_HOME="$(ruby -e 'puts Gem.user_dir')"
+export PATH="$PATH:$GEM_HOME/bin"
+
+# SSH Agent
+export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
+
+# Disable Touchpad by default
+#synclient TouchpadOff=1
+
+# === Command Execution Timing ===
+# Display command execution time similar to VSCode shell output
+# Shows: user time, system time, CPU percentage, total time, and start timestamp
+
+# Initialize timing variables
+zsh_command_start_time=""
+zsh_command_start_timestamp=""
+zsh_command_start_utime=""
+zsh_command_start_stime=""
+
+# Hook to capture command start time and CPU stats
+preexec() {
+    zsh_command_start_time=$SECONDS
+    zsh_command_start_timestamp=$(date '+%H:%M:%S')
+    # Get initial CPU time from /proc/self/stat (field 14 = utime, field 15 = stime, in clock ticks)
+    if [[ -r /proc/self/stat ]]; then
+        local stat_line=($(cat /proc/self/stat))
+        zsh_command_start_utime=${stat_line[13]}  # utime (index 13, 0-based)
+        zsh_command_start_stime=${stat_line[14]}  # stime (index 14, 0-based)
+    else
+        zsh_command_start_utime=0
+        zsh_command_start_stime=0
+    fi
+}
+
+# Hook to display command execution time after command completes
+precmd() {
+    if [[ -n "$zsh_command_start_time" ]]; then
+        local end_time=$SECONDS
+        local end_timestamp=$(date '+%H:%M:%S')
+        local elapsed=$(($end_time - $zsh_command_start_time))
+        
+        if (( elapsed > 0.1 )); then  # Only show for commands taking more than 0.1 seconds
+            # Get final CPU time
+            local end_utime=0
+            local end_stime=0
+            if [[ -r /proc/self/stat ]]; then
+                local stat_line=($(cat /proc/self/stat))
+                end_utime=${stat_line[13]}  # utime
+                end_stime=${stat_line[14]}  # stime
+            fi
+            
+            # Calculate CPU time used (in clock ticks, convert to seconds)
+            # Clock ticks per second is typically 100 (getconf CLK_TCK)
+            local clk_tck=$(getconf CLK_TCK 2>/dev/null || echo 100)
+            local cpu_user_diff=$((end_utime - zsh_command_start_utime))
+            local cpu_system_diff=$((end_stime - zsh_command_start_stime))
+            
+            local user_time=$(echo "scale=2; $cpu_user_diff / $clk_tck" | bc 2>/dev/null || echo "0.00")
+            local system_time=$(echo "scale=2; $cpu_system_diff / $clk_tck" | bc 2>/dev/null || echo "0.00")
+            
+            # Calculate CPU percentage
+            local cpu_percent="0.0"
+            if (( $(echo "$elapsed > 0" | bc -l 2>/dev/null || echo 0) )); then
+                local cpu_total=$(echo "scale=2; $user_time + $system_time" | bc 2>/dev/null || echo "0.00")
+                cpu_percent=$(echo "scale=1; ($cpu_total / $elapsed) * 100" | bc 2>/dev/null || echo "0.0")
+            fi
+            
+            # Format times to match VSCode output format
+            local user_time_str=$(printf "%.2fs" $user_time 2>/dev/null || echo "0.00s")
+            local system_time_str=$(printf "%.2fs" $system_time 2>/dev/null || echo "0.00s")
+            local total_time_str=$(printf "%.2fs" $elapsed 2>/dev/null || echo "0.00s")
+            
+            # Display in VSCode-like format: "start_timestamp end_timestamp user_time system_time CPU% total_time"
+            printf "\033[2m%s %s %s user %s system %s%% cpu %s total\033[0m\n" \
+                "$zsh_command_start_timestamp" \
+                "$end_timestamp" \
+                "$user_time_str" \
+                "$system_time_str" \
+                "$cpu_percent" \
+                "$total_time_str"
+        fi
+        
+        # Reset for next command
+        zsh_command_start_time=""
+        zsh_command_start_utime=""
+        zsh_command_start_stime=""
+    fi
+}
+
+# === AUTOSTART XORG ===
+# https://wiki.archlinux.org/title/Xinit#Autostart_X_at_login
+# This must come before tmux autostart because it uses exec, which replaces the shell process
+[[ -z $DISPLAY && $XDG_VTNR -eq 1 ]] && exec startx
+
+# tmux autostart is managed from the shell role via blockinfile.

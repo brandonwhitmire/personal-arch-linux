@@ -1,0 +1,22 @@
+---
+- name: Install conky
+  become: true
+  ansible.builtin.package:
+    name:
+      - conky  # sysmon
+    state: present
+
+- name: Create conky directory
+  become: true
+  ansible.builtin.file:
+    dest: '{{ conky_theme_dir }}'
+    state: directory
+    mode: '0755'
+
+- name: Upload conky theme
+  become: true
+  ansible.builtin.copy:
+    remote_src: false
+    src: files/conky_theme
+    dest: '{{ conky_theme_dir }}'
+    mode: '0644'

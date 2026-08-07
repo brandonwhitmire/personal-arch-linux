@@ -1,0 +1,38 @@
+---
+# Configure host default language to Spanish
+#
+# Reference:
+# - https://serverfault.com/questions/959026/how-do-i-generate-and-set-the-locale-using-ansible#981742
+# - https://wiki.archlinux.org/title/LightDM#Wrong_locale_displayed
+- name: Install charmap GUI
+  become: true
+  ansible.builtin.package:
+    name:
+      - gucharmap
+    state: present
+
+- name: Check original locale
+  ansible.builtin.command:
+    cmd: localectl status
+  register: locale_status
+  changed_when: false
+
+- name: Parse 'LANG' var from current locale
+  ansible.builtin.set_fact:
+    locale_lang: "{{ locale_status.stdout | regex_search('LANG=([^\n]+)', '\\1') | first }}"
+
+- name: Modify locale settings
+  when: locale_lang != locale_desired_locale
+  block:
+
+    - name: Enable locale '{{ locale_desired_locale }}'
+      become: true
+      community.general.locale_gen:
+        name: '{{ locale_desired_locale }}'
+        state: present
+
+    - name: Configure locale to '{{ locale_desired_locale }}'
+      become: true
+      ansible.builtin.command:
+        cmd: localectl set-locale LANG={{ locale_desired_locale }}
+      changed_when: true

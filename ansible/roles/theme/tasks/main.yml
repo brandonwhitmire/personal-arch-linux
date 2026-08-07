@@ -1,0 +1,93 @@
+---
+# Dark theme setup
+# Reference: https://wiki.archlinux.org/title/GTK#Dark_theme_variant
+# https://wiki.archlinux.org/title/Uniform_look_for_Qt_and_GTK_applications#QGtkStyle
+# https://wiki.archlinux.org/title/GTK#Theme_not_applied_to_root_applications
+- name: '[gtk2] Create config file'
+  ansible.builtin.blockinfile:
+    path: ~/.gtkrc-2.0
+    marker: '# {mark} gtk2_config'
+    block: |
+      gtk-icon-theme-name = "{{ theme_selected_theme }}"
+      gtk-theme-name = "{{ theme_selected_theme }}"
+      gtk-font-name = "DejaVu Sans 11"
+    mode: '0644'
+    create: true
+    state: present
+
+- name: '[gtk2] Install GTK2 from AUR'
+  vars:
+    function_yay_aur_packages:
+      - gtk2
+    function_yay_aur_packages_state: present
+  ansible.builtin.import_role:
+    name: function_yay
+
+- name: '[gtk2] Ensure source file exists'
+  ansible.builtin.stat:
+    path: /home/{{ ansible_user }}/.gtkrc-2.0
+  register: theme_gtk2_rc
+
+- name: '[gtk2] Set root applications to use dark theme'
+  become: true
+  ansible.builtin.file:
+    src: /home/{{ ansible_user }}/.gtkrc-2.0
+    dest: /etc/gtk-2.0/gtkrc
+    force: true
+    state: link
+  when: theme_gtk2_rc.stat.exists
+
+- name: '[gtk3] Create directory'
+  ansible.builtin.file:
+    dest: ~/.config/gtk-3.0/
+    state: directory
+    mode: '0755'
+
+- name: '[gtk3] Set dark theme file'
+  ansible.builtin.blockinfile:
+    path: ~/.config/gtk-3.0/settings.ini
+    marker: '# {mark} gtk3_config'
+    block: |
+      [Settings]
+      gtk-theme-name = {{ theme_selected_theme }}
+      gtk-icon-theme-name = {{ theme_selected_theme }}
+      gtk-font-name = DejaVu Sans 11
+      gtk-application-prefer-dark-theme = true
+    mode: '0644'
+    create: true
+    state: present
+
+- name: '[gtk3] Ensure source file exists'
+  ansible.builtin.stat:
+    path: /home/{{ ansible_user }}/.config/gtk-3.0/settings.ini
+  register: theme_gtk3_settings_file
+
+- name: '[gtk3] Set root applications to use dark theme'
+  become: true
+  ansible.builtin.file:
+    src: /home/{{ ansible_user }}/.config/gtk-3.0/settings.ini
+    dest: /etc/gtk-3.0/settings.ini
+    force: true
+    state: link
+  when: theme_gtk3_settings_file.stat.exists
+
+- name: '[Qt4] Use GTK2 themes'
+  ansible.builtin.blockinfile:
+    path: ~/.config/Trolltech.conf
+    marker: '# {mark} qt4_config'
+    block: |
+      [Qt]
+      style=GTK+
+    mode: '0644'
+    create: true
+    state: present
+
+- name: '[Qt5/6] Install AUR pkgs'
+  vars:
+    function_yay_aur_packages:
+      - dracula-gtk-theme  # dark theme
+      - qt5-styleplugins  # GUI framework
+      # REMOVED: https://wiki.archlinux.org/title/Uniform_look_for_Qt_and_GTK_applications_#QGtkStyle
+      # - qt6gtk2  # GUI framework
+  ansible.builtin.import_role:
+    name: function_yay

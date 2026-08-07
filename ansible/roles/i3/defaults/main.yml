@@ -1,0 +1,13 @@
+---
+# i3 role defaults
+# Launcher selection: 'rofi' or 'dmenu'
+i3_launcher: 'rofi'
+
+# Launcher command based on selection
+i3_launcher_command: "{{ 'rofi -show drun' if i3_launcher == 'rofi' else '/usr/local/bin/dmenu_run_history' }}"
+
+# Power menu launcher command
+i3_powermenu_launcher: "{{ 'rofi -dmenu -i -p Power' if i3_launcher == 'rofi' else 'dmenu -i -p Power' }}"
+
+# Status bar selection: 'polybar' or 'i3status'
+i3_status_bar: 'polybar'

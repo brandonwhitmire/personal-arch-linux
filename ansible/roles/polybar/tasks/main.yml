@@ -1,0 +1,43 @@
+---
+# polybar role - status bar
+# This role installs and configures polybar as the status bar with Dracula theme
+
+- name: Install polybar package
+  become: true
+  ansible.builtin.package:
+    name:
+      - polybar  # status bar
+      - pulseaudio  # for volume module
+    state: present
+
+- name: Ensure polybar config directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/polybar/
+    state: directory
+    mode: '0755'
+
+- name: Clone Dracula theme for polybar  # noqa command-instead-of-module
+  become: false
+  ansible.builtin.git:
+    repo: https://github.com/dracula/polybar.git
+    dest: ~/.config/polybar/dracula
+    update: true
+  changed_when: false
+
+- name: Create polybar config with Dracula theme
+  become: false
+  ansible.builtin.template:
+    src: config.ini.j2
+    dest: ~/.config/polybar/config.ini
+    mode: '0644'
+    force: true
+
+- name: Create polybar launch script
+  become: false
+  ansible.builtin.template:
+    src: launch.sh.j2
+    dest: ~/.config/polybar/launch.sh
+    mode: '0755'
+    force: true
+

@@ -1,0 +1,5 @@
+# Python3 Requirements File
+
+# Ansible
+ansible  # automate configuration and more
+ansible-lint  # ansible-specific linter

@@ -1,0 +1,12 @@
+---
+# Baseline Role - Handlers
+# Handles service restarts when configuration changes
+
+- name: restart systemd-logind
+  become: true
+  ansible.builtin.systemd:
+    name: systemd-logind.service
+    state: restarted
+    daemon_reload: true
+  listen: restart systemd-logind
+

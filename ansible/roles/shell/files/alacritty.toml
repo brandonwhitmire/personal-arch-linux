@@ -1,0 +1,10 @@
+[font]
+size = 12
+
+[font.normal]
+family = "JetbrainsMono Nerd Font"
+style = "Regular"
+
+[scrolling]
+history = 10000
+multiplier = 5

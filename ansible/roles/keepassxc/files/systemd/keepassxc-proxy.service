@@ -1,0 +1,15 @@
+[Unit]
+Description=KeepassXC Proxy for Browser Addon Integration
+
+Wants=network.target
+After=syslog.target network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/keepassxc-proxy
+Restart=on-failure
+RestartSec=10
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,55 @@
+---
+# DNS Blackhole Role - Default Variables
+# Default configuration for DNS blackhole setup
+
+# Path to the custom blocklist file
+dns_blackhole_blocklist_path: /etc/hosts.blocklist
+
+# List of domains to block (can be overridden in group_vars or host_vars)
+dns_blackhole_blocked_domains:
+  # Major social media platforms
+  - facebook.com
+  - twitter.com
+  - x.com
+  - xcancel.com
+  - nitter.net
+  - instagram.com
+  - snapchat.com
+  # Video and streaming platforms
+  - vimeo.com
+  - dailymotion.com
+  # Image and meme sharing
+  - imgur.com
+  - 9gag.com
+  - pinterest.com
+  - tumblr.com
+  # Forums and discussion boards
+  - reddit.com
+  - old.reddit.com
+  - 4chan.org
+  - 8ch.net
+  - 8kun.top
+  - kiwifarms.net
+  - somethingawful.com
+  - neogaf.com
+  # Gaming platforms
+  - roblox.com
+  - minecraft.net
+  - epicgames.com
+  # News and timewaster sites
+  - nytimes.com/
+  - upworthy.com
+  - huffpost.com
+  - vice.com
+  - quora.com
+  - buzzfeed.com
+  - buzzfeednews.com
+  # Image hosting and art communities
+  - flickr.com
+  - photobucket.com
+
+# NetworkManager configuration file path
+dns_blackhole_networkmanager_config: /etc/NetworkManager/conf.d/10-dnsmasq.conf
+
+# dnsmasq configuration file path
+dns_blackhole_dnsmasq_config: /etc/NetworkManager/dnsmasq.d/blocklist.conf

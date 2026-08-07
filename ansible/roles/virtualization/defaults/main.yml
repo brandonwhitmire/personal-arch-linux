@@ -1,0 +1,3 @@
+---
+virtualization_vbox: true
+virtualization_qemu: false

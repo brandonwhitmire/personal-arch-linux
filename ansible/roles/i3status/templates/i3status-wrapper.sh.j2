@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Wrapper script for i3status that monitors battery and changes i3 bar background color
+# when battery is below 20% by modifying i3 config and reloading
+
+BATTERY_PATH="/sys/class/power_supply/BAT0"
+LOW_THRESHOLD=20
+I3_CONFIG="$HOME/.config/i3/config"
+NORMAL_BG="#282a36"
+LOW_BG="#ff5555"
+LAST_STATE=""
+
+# Function to update i3 bar background color
+update_bar_color() {
+    local color=$1
+    local state=$2
+    
+    # Only update if state changed
+    if [ "$state" != "$LAST_STATE" ]; then
+        # Use sed to replace the background color in i3 config
+        if [ -f "$I3_CONFIG" ]; then
+            if [ "$state" = "low" ]; then
+                sed -i "s/background #282a36/background $LOW_BG/g" "$I3_CONFIG" 2>/dev/null || true
+            else
+                sed -i "s/background $LOW_BG/background $NORMAL_BG/g" "$I3_CONFIG" 2>/dev/null || true
+            fi
+            # Reload i3 config
+            i3-msg reload 2>/dev/null || true
+            LAST_STATE="$state"
+        fi
+    fi
+}
+
+# Monitor battery in background
+(
+    while true; do
+        if [ -d "$BATTERY_PATH" ]; then
+            CAPACITY=$(cat "$BATTERY_PATH/capacity" 2>/dev/null)
+            STATUS=$(cat "$BATTERY_PATH/status" 2>/dev/null)
+            
+            if [ -n "$CAPACITY" ] && [ "$STATUS" != "Charging" ] && [ "$CAPACITY" -lt "$LOW_THRESHOLD" ]; then
+                # Battery is low - change bar background to red
+                update_bar_color "$LOW_BG" "low"
+            else
+                # Battery is OK - restore normal background
+                update_bar_color "$NORMAL_BG" "normal"
+            fi
+        fi
+        sleep 5
+    done
+) &
+
+# Run i3status
+exec i3status "$@"
+

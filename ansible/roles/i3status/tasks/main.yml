@@ -1,0 +1,27 @@
+---
+# i3status role - isolated status bar role
+# This role installs and configures i3status as the status bar
+
+- name: Ensure i3status config directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/i3status/
+    state: directory
+    mode: '0755'
+
+- name: Copy i3status config file
+  become: false
+  ansible.builtin.copy:
+    force: true
+    src: files/i3status_rc
+    dest: ~/.config/i3status/config
+    mode: '0644'
+
+- name: Create i3status wrapper script for battery monitoring
+  become: false
+  ansible.builtin.template:
+    src: i3status-wrapper.sh.j2
+    dest: ~/.config/i3status/i3status-wrapper.sh
+    mode: '0755'
+    force: true
+

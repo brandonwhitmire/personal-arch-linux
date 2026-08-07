@@ -1,0 +1,6 @@
+---
+# Ansible Galaxy Collections Requirements File
+collections:
+  - name: kewlfft.aur  # function: install AUR packages
+  - name: community.general
+    version: '*'

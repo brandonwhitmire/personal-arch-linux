@@ -1,0 +1,166 @@
+---
+# i3 window manager setup
+#
+# Boot Sequence:
+# systemd boot -> systemd unitfile -> agetty (autologin into user) -> zsh (sources .zshrc) -> startx (sources .xinitrc) -> i3
+#
+- name: Install i3 pkgs
+  become: true
+  ansible.builtin.package:
+    name:
+      - i3  # metapackage of various i3 packages
+      - redshift  # screen color temperature adjustment (includes redshift-gtk)
+    state: present
+
+# https://wiki.archlinux.org/title/Getty#Virtual_console
+- name: Ensure systemd folder for autologin exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/systemd/system/getty@tty1.service.d/
+    owner: root
+    group: root
+    mode: '0755'
+    state: directory
+
+- name: Systemd unitfile for autologin via agetty
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    marker: '# {mark} agetty_autologin'
+    block: |
+      [Service]
+      # This empty ExecStart line must be present to ensure autologin works properly
+      ExecStart=
+      ExecStart=-/sbin/agetty --autologin {{ ansible_user }} --noclear %I 38400 linux
+    owner: root
+    group: root
+    mode: '0644'
+    create: true
+    state: present
+
+- name: Create .xinitrc from template
+  become: false
+  ansible.builtin.template:
+    src: xinitrc.j2
+    dest: ~/.xinitrc
+    mode: '0755'
+    backup: false
+
+- name: Ensure i3 config dir is present
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/i3/
+    state: directory
+    mode: '0755'
+
+- name: Copy default i3 file to `{{ ansible_user }}` profile
+  become: false
+  ansible.builtin.template:
+    src: i3_rc.j2
+    dest: ~/.config/i3/config
+    mode: '0644'
+    backup: false
+  register: i3_config_changed
+
+- name: Ensure i3 scripts directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/i3/scripts/
+    state: directory
+    mode: '0755'
+
+- name: Copy powermenu script (template)
+  become: false
+  ansible.builtin.template:
+    force: true
+    src: powermenu.sh.j2
+    dest: ~/.config/i3/scripts/powermenu.sh
+    mode: '0755'
+  register: i3_config_changed
+
+- name: Copy autostart script (template)
+  become: false
+  ansible.builtin.template:
+    force: true
+    src: autostart.sh.j2
+    dest: ~/.config/i3/scripts/autostart.sh
+    mode: '0755'
+  register: i3_config_changed
+
+- name: Ensure redshift config directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/
+    state: directory
+    mode: '0755'
+
+- name: Copy redshift config file (template)
+  become: false
+  ansible.builtin.template:
+    force: true
+    src: redshift.conf.j2
+    dest: ~/.config/redshift.conf
+    mode: '0644'
+
+- name: Create /usr/bin/hack script (quick lab dev environment)
+  become: true
+  ansible.builtin.copy:
+    src: hack
+    dest: /usr/bin/hack
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Install hack.desktop file for Rofi launcher
+  become: true
+  ansible.builtin.copy:
+    src: hack.desktop
+    dest: /usr/share/applications/hack.desktop
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Install AUR pkgs
+  vars:
+    function_yay_aur_packages:
+      - pa-applet-git  # applet for PulseAudio
+  ansible.builtin.import_role:
+    name: function_yay
+
+# Validate i3 configuration syntax using i3 built-in check
+- name: Verify i3 configuration syntax
+  become: false
+  ansible.builtin.command: i3 -C -c ~/.config/i3/config
+  when: i3_config_changed is defined and i3_config_changed.changed
+  changed_when: false
+
+- name: Check if i3 is running and ready
+  become: false
+  ansible.builtin.shell: |
+    set -o pipefail
+    # Check if i3 process exists
+    if ! pgrep -x i3 > /dev/null; then
+      exit 1
+    fi
+    # Verify i3 socket is accessible by trying a simple command
+    # This will fail if DISPLAY is not set or socket is not ready
+    i3-msg -t get_version > /dev/null 2>&1
+  register: i3_ready
+  failed_when: false
+  changed_when: false
+  environment:
+    DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"
+
+- name: Reload i3 configuration
+  become: false
+  ansible.builtin.command: i3-msg reload
+  changed_when: false
+  retries: 3
+  delay: 2
+  register: i3_reload_result
+  until: i3_reload_result.rc == 0
+  when:
+    - i3_config_changed is defined and i3_config_changed.changed
+    - i3_ready is defined and i3_ready.rc == 0
+  environment:
+    DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"

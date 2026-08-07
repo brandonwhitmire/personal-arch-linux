@@ -1,0 +1,89 @@
+---
+# NVIDIA GPU support role
+# Handles detection and configuration for NVIDIA GPUs (specifically Pascal and older)
+# Uses nvidia-580xx legacy drivers and envycontrol for GPU switching
+
+- name: Check if Nvidia GPU is present
+  become: false
+  ansible.builtin.shell: |
+    set -o pipefail
+    lspci | grep -i nvidia > /dev/null 2>&1
+  register: nvidia_gpu_check
+  changed_when: false
+  failed_when: false
+
+- name: Set fact for Nvidia GPU presence
+  ansible.builtin.set_fact:
+    nvidia_has_gpu: "{{ nvidia_gpu_check.rc == 0 }}"
+
+- name: Configure NVIDIA GPU support
+  when: nvidia_has_gpu | bool
+  block:
+    - name: Install AUR pkgs (nvidia-580xx drivers and envycontrol)
+      vars:
+        function_yay_aur_packages:
+          - nvidia-580xx-dkms
+          - nvidia-580xx-utils
+          - lib32-nvidia-580xx-utils
+          - nvidia-580xx-settings
+          - envycontrol
+      ansible.builtin.import_role:
+        name: function_yay
+
+    - name: Check if {{ nvidia_drm_modeset_param }} exists in GRUB_CMDLINE_LINUX_DEFAULT
+      become: true
+      ansible.builtin.shell: |
+        set -o pipefail
+        grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub | grep -q '{{ nvidia_drm_modeset_param }}' || exit 1
+      register: nvidia_grub_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if GRUB_CMDLINE_LINUX_DEFAULT exists
+      become: true
+      ansible.builtin.shell: |
+        set -o pipefail
+        grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub || exit 1
+      register: nvidia_grub_default_exists
+      changed_when: false
+      failed_when: false
+      when: nvidia_grub_check.rc != 0
+
+    - name: Add {{ nvidia_drm_modeset_param }} to existing GRUB_CMDLINE_LINUX_DEFAULT
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        backrefs: true
+        regexp: '^(GRUB_CMDLINE_LINUX_DEFAULT=".*)"$'
+        line: '\1 {{ nvidia_drm_modeset_param }}"'
+        state: present
+        backup: true
+      register: nvidia_grub_changed
+      when:
+        - nvidia_grub_check.rc != 0
+        - nvidia_grub_default_exists.rc == 0
+
+    - name: Create GRUB_CMDLINE_LINUX_DEFAULT with {{ nvidia_drm_modeset_param }}
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        line: 'GRUB_CMDLINE_LINUX_DEFAULT="{{ nvidia_drm_modeset_param }}"'
+        state: present
+        backup: true
+      register: nvidia_grub_changed
+      when:
+        - nvidia_grub_check.rc != 0
+        - nvidia_grub_default_exists.rc != 0
+
+    - name: Update GRUB configuration
+      become: true
+      ansible.builtin.command:
+        cmd: grub-mkconfig -o /boot/grub/grub.cfg
+      changed_when: false
+      when: nvidia_grub_changed is defined and nvidia_grub_changed.changed
+
+    # NOTE: steam must be at the end since it upgrades the system,
+    # which breaks some other things until a reboot is completed
+    - name: Install and configure Steam (requires discrete GPU)
+      ansible.builtin.import_role:
+        name: steam

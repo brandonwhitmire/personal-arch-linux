@@ -1,0 +1,27 @@
+# Packer
+*.iso
+*lock
+*.swp
+output*
+packer_cache
+*.vm*
+*.nvram
+*.md.backup
+*ssh/
+id_*
+known_hosts
+authorized_keys
+
+# Ansible / Vagrant
+.vagrant
+.ansible
+*creds*
+*vault*
+all
+hosts*
+artifacts/
+*.log
+.yamllint
+venv/
+.vscode/
+*.tmp

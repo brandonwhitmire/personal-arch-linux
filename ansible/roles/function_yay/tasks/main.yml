@@ -1,0 +1,151 @@
+---
+# === Install AUR packages via yay ===
+#
+# Invoke like so (no indention nor inside of task block):
+#
+# - name: Install AUR pkgs
+#   vars:
+#     function_yay_aur_packages:
+#       - package1
+#       - package2
+#       ...
+#     function_yay_aur_packages_state: present|latest  # pick only one to install/uninstall
+#   ansible.builtin.import_role:
+#     name: function_yay
+#
+# LIMITATIONS:
+# 'absent' for >>aur_packages_state<< doesn't work. Just uninstall with pacman normally.
+#
+# PREREQUISITES:
+# "ansible-yay" or "kewlfft.aur" module installed into plugins/modules folder
+#
+# Reference:
+# https://github.com/mnussbaum/ansible-yay
+#
+# NOTE:
+# This playbook temporarily adds/removes a passwordless sudo ansible_user
+# when using yay module since yay cannot be ran with sudo
+# but will require (and prompt for sudoer password) later.
+# This is a pretty egrious security hole, but the playbook is written such
+# that it should always remove that hole after packages are installed, removed
+# or failed.
+#
+# Reference:
+# https://github.com/kewlfft/ansible-aur#create-the-aur_builder-user
+- name: '=== [AUR_FUNCTION_START] Add/Remove >>AUR<< packages ==='
+  when: ansible_facts["distribution"] == "Archlinux"
+  vars:
+    yay_dir: /tmp/yay-bin/
+  block:
+
+    - name: Check if yay is already installed
+      become: true
+      ansible.builtin.stat:
+        path: /usr/bin/yay
+      register: function_yay_yay_exists
+
+    - name: Check which AUR packages are already installed and determine what needs to be installed
+      become: true
+      ansible.builtin.command: pacman -Q {{ item }}
+      register: function_yay_packages_check
+      failed_when: false
+      changed_when: false
+      loop: '{{ function_yay_aur_packages }}'
+      when: function_yay_aur_packages_state in ['present', 'latest']
+
+    - name: Set packages to install based on current state
+      ansible.builtin.set_fact:
+        function_yay_packages_to_install: >-
+          {{
+            function_yay_aur_packages if function_yay_aur_packages_state == 'absent'
+            else function_yay_packages_check.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list
+          }}
+
+    - name: Process packages only if some need to be installed
+      when: function_yay_packages_to_install | length > 0
+      block:
+
+        - name: Ensure yay dependencies are installed
+          become: true
+          ansible.builtin.package:
+            name:
+              - base-devel
+              - git
+            state: present
+          when: not function_yay_yay_exists.stat.exists
+
+        - name: Install yay from AUR if not present
+          when: not function_yay_yay_exists.stat.exists
+          block:
+
+            - name: Create git directory
+              become: false
+              ansible.builtin.file:
+                path: '{{ yay_dir }}'
+                state: directory
+                mode: '0755'
+
+            - name: Clone yay repository
+              become: false
+              ansible.builtin.git:
+                repo: https://aur.archlinux.org/yay-bin.git
+                dest: '{{ yay_dir }}'
+                clone: true
+                update: false
+                force: false
+                version: '{{ function_yay_yay_version }}'
+
+            - name: Build and install yay
+              become: false
+              ansible.builtin.command:
+                chdir: '{{ yay_dir }}'
+                cmd: makepkg --syncdeps --install --force --noconfirm
+                creates: /usr/bin/yay
+
+            - name: Verify yay installation
+              become: false
+              ansible.builtin.command: yay --version
+              changed_when: false
+              when: not function_yay_yay_exists.stat.exists
+
+        - name: 'Add `{{ function_yay_passwordless_sudo_user }}` user to sudoers enabling passwordless `sudo {{ function_yay_passwordless_sudo_program }}`'
+          become: true
+          ansible.builtin.lineinfile:
+            path: '{{ function_yay_passwordless_sudo_file }}'
+            regexp: '^{{ function_yay_passwordless_sudo_user }}\s+ALL=\(ALL\)\s+NOPASSWD:\s+{{ function_yay_passwordless_sudo_program }}$'
+            line: '{{ function_yay_passwordless_sudo_user }} ALL=(ALL) NOPASSWD: {{ function_yay_passwordless_sudo_program }}'
+            create: true
+            validate: 'visudo --check --strict --file=%s'
+            mode: '0440'
+            state: present
+
+        - name: 'When package is absent'
+          when: '"absent" in function_yay_aur_packages_state'
+          ansible.builtin.fail:
+            msg:
+              - '"absent" as state for `aur_packages_state` does NOT work'
+              - 'Uninstall with pacman normally'
+
+        - name: 'Ensure {{ function_yay_packages_to_install }} pkgs are: {{ function_yay_aur_packages_state }}'
+          become: false
+          kewlfft.aur.aur:
+            name:
+              - '{{ item }}'
+            state: '{{ function_yay_aur_packages_state }}'
+          register: function_yay_aur_install_result
+          until: function_yay_aur_install_result is succeeded
+          retries: 3
+          delay: 3 # in seconds
+          loop: '{{ function_yay_packages_to_install }}'
+
+  # Always removes this temp security hole even with a previous failure
+  always:
+    - name: === [AUR_FUNCTION_END] Cleanup `{{ function_yay_passwordless_sudo_user }}` user from `{{ function_yay_passwordless_sudo_file }}` ===
+      become: true
+      changed_when: false
+      ansible.builtin.lineinfile:
+        path: '{{ function_yay_passwordless_sudo_file }}'
+        line: '{{ function_yay_passwordless_sudo_user }} ALL=(ALL) NOPASSWD: {{ function_yay_passwordless_sudo_program }}'
+        validate: 'visudo --check --strict --file=%s'
+        state: absent
+      when: function_yay_packages_to_install is defined and function_yay_packages_to_install | length > 0

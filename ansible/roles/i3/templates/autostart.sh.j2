@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# This script is executed by i3 on startup.
+
+# Terminate already running instances of programs
+# Array of programs to kill before restarting
+# Note: i3status is managed by i3 itself (via bar {} block in config) and will be
+#       automatically restarted by i3, so it doesn't need to be launched here
+PROGRAMS_TO_KILL=(
+    dunst
+    nitrogen
+    nm-applet
+    blueman-applet
+    flameshot
+    conky
+    polybar
+    i3status
+)
+
+# Kill all programs in the array
+for program in "${PROGRAMS_TO_KILL[@]}"; do
+    killall -q "$program" 2>/dev/null || true
+done
+
+# Wait until the processes have been shut down
+for program in "${PROGRAMS_TO_KILL[@]}"; do
+    while pgrep -u $UID -x "$program" >/dev/null; do
+        sleep 1
+    done
+done
+
+# Display configuration is handled by ~/.xprofile which runs early in X session
+# No need to configure displays here - they're already configured by the time this runs
+
+# Set wallpaper
+nitrogen --restore &
+
+# Launch notification daemon
+dunst &
+
+# Launch applets in the background
+nm-applet &
+blueman-applet &
+flameshot &
+
+# Launch password manager
+#keepassxc &
+
+# Launch system monitor
+conky --config=/usr/share/conky/conky_theme &
+
+# Start PulseAudio and applet
+start-pulseaudio-x11 &
+pa-applet &
+
+# Set keyboard numlock state
+/usr/bin/numlockx on &
+
+# Start screen temperature utility
+/usr/bin/redshift-gtk &
+
+# Start screen locker daemon with 5s idle delay (no delay on suspend)
+xset s 900 5 &
+xss-lock -- sh -c 'exec i3lock -n --ignore-empty-password --color=540853' &
+
+{% if i3_status_bar == 'polybar' %}
+# Launch polybar
+~/.config/polybar/launch.sh &
+{% elif i3_status_bar == 'i3status' %}
+# i3status is automatically launched by i3 via the bar {} block in the config
+# No explicit launch needed here
+{% endif %}
+
+echo "Autostart script finished."
+

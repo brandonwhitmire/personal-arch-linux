@@ -1,0 +1,6 @@
+# You can skip specific rules or tags by adding them to your configuration file:
+# .ansible-lint
+skip_list:  # or 'skip_list' to silence them completely
+  - schema[playbook]
+  - yaml[line-length]
+  - name[template]

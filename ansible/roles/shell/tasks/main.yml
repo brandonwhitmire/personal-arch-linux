@@ -1,0 +1,278 @@
+---
+- name: Install needed OS pkgs
+  become: true
+  ansible.builtin.package:
+    name:
+      # - python  # the legend
+      # - python-pip  # install pkgs from PyPI
+      # - python-setuptools  # build packages
+      # - python-pynvim  # python3 for neovim
+      - zsh  # shell
+      - zsh-completions  # zsh command completions
+      - zsh-syntax-highlighting  # zsh syntax highlighting
+      - zsh-autosuggestions  # finish commands from history
+      - zsh-history-substring-search  # autosearch via history
+      - grml-zsh-config  # zsh config used in archiso (liveboot ISO)
+      - pkgfile  # command not found trick
+      - zoxide  # smarter cd
+      - fzf  # fuzzy finder
+      - ripgrep  # fast, recursive grep searcher
+      - fd  # faster `find` command
+      - alacritty  # terminal
+      - vim  # text editor
+      - neovim  # upgraded text editor
+      - ttf-jetbrains-mono-nerd  # font
+      - ttf-nerd-fonts-symbols  # additional nerd font symbols
+      - ttf-nerd-fonts-symbols-mono  # monospace nerd font symbols
+      - powerline  # font
+      - rsync  # (remote) file syncer
+      - glxinfo  # GPU info
+      - colordiff  # diff with color
+      - borg  # encrypted, de-duplicated backups
+      - python-llfuse  # dep for borg backup
+      - qbittorrent  # torrent manager
+      - nodejs  # dep for coc.nvim
+      - xclip  # dep for vim clipboard
+      - galculator  # default calc
+      - geckodriver  # used by Selenium for Firefox browsers
+      - screenfetch  # display system info
+      - socat  # dep for powerline
+      - xorg-xrandr  # dep for powerline
+      - ansible-lint  # linter for Ansible
+      # - texlive-most  # LaTeX generator dep for vim-latex-live-preview
+      - deepin-image-viewer  # simple image viewer
+      - starship  # prompt
+      - tmux  # terminal multiplexer
+    state: present
+
+# https://wiki.archlinux.org/title/Powerline
+# https://powerline.readthedocs.io/en/master/installation.html
+#    - name: Install needed pip3 pkgs
+#      ansible.builtin.pip:
+#        extra_args: --break-system-packages
+#        name:
+#          - psutil  # soft dep for powerline
+#          - pygit2  # soft dep for powerline
+#          - i3ipc  # soft dep for powerline
+#          - powerline-status  # terminal beautification
+#          - neovim  # used by neovim
+
+- name: Add functionality for shells
+  ansible.builtin.blockinfile:
+    path: '/home/{{ ansible_user }}/{{ item }}'
+    marker: "# {mark} zsh_rc"
+    block: "{{ lookup('file', 'files/zsh_rc') }}"
+    create: true
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0644'
+    state: present
+  loop:
+    - .zshrc
+    # - .bashrc
+
+- name: Add tmux autostart for interactive shells
+  ansible.builtin.blockinfile:
+    path: '/home/{{ ansible_user }}/{{ item }}'
+    marker: '# {mark} tmux_autostart'
+    block: |
+      # Auto-start tmux for interactive shells.
+      if [ -z "$TMUX" ] && [ -n "$PS1" ] && command -v tmux >/dev/null 2>&1; then
+          tmux attach-session -t main || tmux new-session -s main
+      fi
+    create: true
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0644'
+    state: present
+  loop:
+    - .zshrc
+    - .bashrc
+
+- name: Copy custom zsh_rc to root
+  become: true
+  ansible.builtin.copy:
+    backup: true
+    remote_src: true
+    src: '/home/{{ ansible_user }}/{{ item }}'
+    dest: '/root/{{ item }}'
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - .zshrc
+    # - .bashrc
+
+- name: Ensure tmux data directory exists
+  ansible.builtin.file:
+    path: '/home/{{ ansible_user }}/my_data/tmux_logs'
+    state: directory
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+
+- name: Ensure tmux config directory exists
+  ansible.builtin.file:
+    path: '/home/{{ ansible_user }}/.tmux'
+    state: directory
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+
+- name: Deploy tmux configuration
+  ansible.builtin.copy:
+    src: files/tmux.conf
+    dest: '/home/{{ ansible_user }}/.tmux.conf'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0644'
+
+- name: Ensure tmux plugin directory exists
+  ansible.builtin.file:
+    path: '/home/{{ ansible_user }}/.tmux/plugins'
+    state: directory
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+
+- name: Install TPM (tmux plugin manager)
+  ansible.builtin.git:
+    repo: https://github.com/tmux-plugins/tpm
+    dest: '/home/{{ ansible_user }}/.tmux/plugins/tpm'
+    version: master
+
+- name: Install tmux plugins from tmux.conf
+  ansible.builtin.shell: |
+    set -e
+    tmux start-server
+    tmux new-session -d -s ansible-tpm-bootstrap 2>/dev/null || true
+    "$TMUX_PLUGIN_MANAGER_PATH/tpm/bin/install_plugins"
+    tmux kill-server
+  args:
+    executable: /bin/bash
+  environment:
+    TMUX_PLUGIN_MANAGER_PATH: '/home/{{ ansible_user }}/.tmux/plugins/'
+  changed_when: false
+
+- name: Ensure tmux resurrect directory exists
+  ansible.builtin.file:
+    path: '/home/{{ ansible_user }}/.tmux/resurrect'
+    state: directory
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+
+- name: Bootstrap empty tmux resurrection file to suppress restore error
+  ansible.builtin.copy:
+    content: ""
+    dest: '/home/{{ ansible_user }}/.tmux/resurrect/last'
+    force: false
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0644'
+
+- name: 'Set default shell to zsh for users root and {{ ansible_user }}'
+  become: true
+  ansible.builtin.user:
+    name: '{{ item }}'
+    shell: /usr/bin/zsh
+  loop:
+    - '{{ ansible_user }}'
+    - root
+
+- name: Build pkgfile cache (first time only)
+  become: true
+  ansible.builtin.command:
+    cmd: pkgfile --update
+    creates: /var/cache/pkgfile/
+
+- name: Ensure nvim directory exists
+  ansible.builtin.file:
+    path: ~/.config/nvim/
+    state: directory
+    mode: '0755'
+
+# https://nvchad.com/docs/quickstart/install#install
+- name: 'Clone nvChad to profile: {{ ansible_user }}'  # noqa latest[git]
+  ansible.builtin.git:
+    repo: https://github.com/NvChad/starter
+    dest: ~/.config/nvim
+  register: shell_nvchad_cloned
+
+- name: Initialize nvim
+  ansible.builtin.command:
+    cmd: nvim --headless '+qa'
+  when: shell_nvchad_cloned.changed
+  changed_when: false
+  failed_when: false
+
+- name: Sync nvim plugins with Lazy
+  ansible.builtin.command:
+    cmd: nvim --headless '+lua require("lazy").sync()' '+qa'
+  changed_when: false
+  failed_when: false
+
+- name: Install Mason packages
+  ansible.builtin.command:
+    cmd: nvim --headless '+MasonInstallAll' '+qa'
+  changed_when: false
+  failed_when: false
+
+- name: Ensure alacritty directory exists
+  ansible.builtin.file:
+    path: ~/.config/alacritty/
+    state: directory
+    mode: '0755'
+
+- name: Set default font for terminal `alacritty`
+  ansible.builtin.copy:
+    force: true
+    src: files/alacritty.toml
+    dest: ~/.config/alacritty/alacritty.toml
+    mode: '0644'
+
+- name: Template /etc/environment
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/environment
+    marker: '# {mark} environment_config'
+    block: |
+      EDITOR=/usr/bin/nvim
+      BROWSER={{ shell_default_browser_fullpath }}
+      TERMINAL=/usr/bin/alacritty
+    create: true
+    state: present
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: 'Template {{ shell_mimeapps_file }}'
+  ansible.builtin.blockinfile:
+    path: '{{ shell_mimeapps_file }}'
+    marker: '# {mark} mimeapps_list_config'
+    block: |
+      [Default Applications]
+      text/html={{ shell_default_browser_name }}.desktop
+      x-scheme-handler/http={{ shell_default_browser_name }}.desktop
+      x-scheme-handler/https={{ shell_default_browser_name }}.desktop
+      x-scheme-handler/ftp={{ shell_default_browser_name }}.desktop
+      x-scheme-handler/chrome={{ shell_default_browser_name }}.desktop
+      application/x-extension-htm={{ shell_default_browser_name }}.desktop
+      application/x-extension-html={{ shell_default_browser_name }}.desktop
+      application/x-extension-shtml={{ shell_default_browser_name }}.desktop
+      application/xhtml+xml={{ shell_default_browser_name }}.desktop
+      application/x-extension-xhtml={{ shell_default_browser_name }}.desktop
+      application/x-extension-xht={{ shell_default_browser_name }}.desktop
+      image/jpeg={{ shell_default_image_viewer }}.desktop
+      image/png={{ shell_default_image_viewer }}.desktop
+    create: true
+    state: present
+    mode: '0644'
+
+- name: Copy starship configuration
+  become: false
+  ansible.builtin.copy:
+    force: true
+    src: files/starship.toml
+    dest: ~/.config/starship.toml
+    mode: '0644'

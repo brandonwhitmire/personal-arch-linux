@@ -1,0 +1,223 @@
+; Dracula theme colors
+[colors]
+background = #282a36
+background-alt = #44475a
+foreground = #f8f8f2
+primary = #bd93f9
+secondary = #ffb86c
+alert = #ff5555
+disabled = #6272a4
+
+; Bar configuration
+[bar/main]
+monitor = ${env:MONITOR}
+width = 100%
+height = 30
+offset-x = 0
+offset-y = 0
+radius = 0.0
+fixed-center = true
+
+; Enable IPC for interactions (required for clickable applets)
+enable-ipc = true
+
+background = ${colors.background}
+foreground = ${colors.foreground}
+
+line-size = 3
+line-color = #f8f8f2
+
+border-size = 0
+border-color = #00000000
+
+padding-left = 0
+padding-right = 0
+
+module-margin-left = 1
+module-margin-right = 1
+
+font-0 = "JetBrainsMono Nerd Font:size=12;3"
+font-1 = "Font Awesome 6 Free:style=Solid:size=12;3"
+font-2 = "Font Awesome 6 Brands:size=12;3"
+
+modules-left = i3
+; modules-center = date
+modules-right = separator network-wireless network-wired separator disk separator cpu separator memory separator battery separator date separator
+
+tray-position = right
+tray-padding = 2
+tray-background = ${colors.background}
+tray-detached = false
+tray-maxsize = 16
+tray-scale = 1.0
+tray-offset-x = 0
+tray-offset-y = 0
+
+; i3 module
+[module/i3]
+type = internal/i3
+format = <label-state> <label-mode>
+index-sort = true
+wrapping-scroll = false
+
+label-mode-padding = 2
+label-mode-foreground = #000
+label-mode-background = ${colors.primary}
+
+label-focused = %index%
+label-focused-background = ${colors.background-alt}
+label-focused-underline = ${colors.primary}
+label-focused-padding = 2
+label-focused-click = i3-msg workspace number %index%
+
+label-unfocused = %index%
+label-unfocused-padding = 2
+label-unfocused-click = i3-msg workspace number %index%
+
+label-visible = %index%
+label-visible-background = ${self.label-focused-background}
+label-visible-underline = ${self.label-focused-underline}
+label-visible-padding = ${self.label-focused-padding}
+label-visible-click = i3-msg workspace number %index%
+
+label-urgent = %index%
+label-urgent-background = ${colors.alert}
+label-urgent-padding = 2
+label-urgent-click = i3-msg workspace number %index%
+
+; Mouse wheel support for workspace switching
+enable-scroll = true
+scroll-up = i3-msg workspace next
+scroll-down = i3-msg workspace prev
+
+; Date module
+[module/date]
+type = internal/date
+interval = 1.0
+
+date = %a, %d-%b %H:%M
+date-alt = %A, %d %B %Y
+
+label = %date%
+label-foreground = ${colors.foreground}
+
+; CPU module
+[module/cpu]
+type = internal/cpu
+interval = 2
+label = CPU %percentage:2%%
+
+; Memory module
+[module/memory]
+type = internal/memory
+interval = 2
+format = <label>
+label = MEM %gb_used%/%gb_total%
+format-warn = <label-warn>
+label-warn = MEM %gb_used%/%gb_total%
+warn-percentage = 10
+
+; Wireless network module - using built-in polybar network module
+[module/network-wireless]
+type = internal/network
+interface-type = wireless
+interval = 3.0
+unknown-as-up = true
+accumulate-stats = true
+udspeed-minwidth = 5
+
+format-connected = <ramp-signal> <label-connected>
+format-disconnected = <label-disconnected>
+
+label-connected = WIFI %local_ip%
+label-connected-foreground = ${colors.foreground}
+label-disconnected = not connected
+label-disconnected-foreground = ${colors.disabled}
+
+ramp-signal-0 = ✗
+ramp-signal-1 = ░
+ramp-signal-2 = ▒
+ramp-signal-3 = ▓
+ramp-signal-4 = █
+ramp-signal-5 = █
+
+; Wired network module - using built-in polybar network module
+[module/network-wired]
+type = internal/network
+interface-type = wired
+interval = 3.0
+unknown-as-up = true
+accumulate-stats = true
+udspeed-minwidth = 5
+
+format-connected = <label-connected>
+format-disconnected = <label-disconnected>
+
+label-connected = ETH %local_ip%
+label-connected-foreground = ${colors.foreground}
+label-disconnected = 
+label-disconnected-foreground = ${colors.disabled}
+
+; Disk module
+[module/disk]
+type = internal/fs
+interval = 25
+mount-0 = /
+format-mounted = <label-mounted>
+format-unmounted = <label-unmounted>
+label-mounted = HDD %used%/%total%
+label-unmounted = %mountpoint%: not mounted
+label-unmounted-foreground = ${colors.disabled}
+
+; Battery module - always shows power info even when plugged in or at 100%
+[module/battery]
+type = internal/battery
+battery = BAT0
+adapter = AC
+full-at = 99
+low-at = 20
+time-format = %H:%M
+poll-interval = 5
+
+format-charging = <ramp-capacity> <label-charging>
+format-discharging = <ramp-capacity> <label-discharging>
+format-full = <ramp-capacity> <label-full>
+format-plugged = <ramp-capacity> <label-plugged>
+format-low = <ramp-capacity> <label-low>
+
+label-charging = CHR %percentage%% %time%
+label-discharging = BAT %percentage%% %time%
+label-full = PLUG %percentage%%
+label-plugged = PLUG %percentage%%
+label-low = BAT %percentage%% %time% LOW
+label-low-foreground = #FFFFFF
+label-low-background = #ff5555
+
+ramp-capacity-0 = ✗
+ramp-capacity-1 = ░
+ramp-capacity-2 = ▒
+ramp-capacity-3 = ▓
+ramp-capacity-4 = █
+
+; Volume module with mouse wheel support
+[module/volume]
+type = internal/pulseaudio
+format-volume = <label-volume>
+label-volume = VOL %percentage%%
+label-volume-foreground = ${colors.foreground}
+format-muted = <label-muted>
+label-muted = muted
+label-muted-foreground = ${colors.disabled}
+
+; Mouse controls for volume
+click-right = pavucontrol
+scroll-up = pactl set-sink-volume @DEFAULT_SINK@ +5%
+scroll-down = pactl set-sink-volume @DEFAULT_SINK@ -5%
+click-middle = pactl set-sink-mute @DEFAULT_SINK@ toggle
+
+; Separator module
+[module/separator]
+type = custom/text
+content = "│"
+content-foreground = ${colors.disabled}
+

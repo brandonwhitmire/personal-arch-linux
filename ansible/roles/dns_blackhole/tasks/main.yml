@@ -1,0 +1,73 @@
+---
+# DNS Blackhole Role - Main Tasks
+# Configures a local DNS blackhole using dnsmasq with NetworkManager
+
+- name: Install dnsmasq package
+  become: true
+  community.general.pacman:
+    name: dnsmasq
+    state: present
+    update_cache: true
+
+- name: Ensure dnsmasq service is not enabled (NetworkManager will manage it)
+  become: true
+  ansible.builtin.systemd:
+    name: dnsmasq.service
+    enabled: false
+    state: stopped
+
+- name: Create NetworkManager dnsmasq configuration directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d
+    state: directory
+    mode: '0755'
+
+- name: Configure NetworkManager to use dnsmasq
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/10-dnsmasq.conf
+    content: |
+      [main]
+      dns=dnsmasq
+    mode: '0644'
+    backup: true
+  notify: restart NetworkManager
+
+- name: Create custom blocklist file
+  become: true
+  ansible.builtin.copy:
+    dest: "{{ dns_blackhole_blocklist_path }}"
+    content: |
+      # My custom blocklist for productivity
+      {% for domain in dns_blackhole_blocked_domains %}
+      0.0.0.0 {{ domain }}
+      0.0.0.0 www.{{ domain }}
+      {% endfor %}
+    mode: '0644'
+    backup: true
+
+- name: Create NetworkManager dnsmasq configuration directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/NetworkManager/dnsmasq.d
+    state: directory
+    mode: '0755'
+
+- name: Configure dnsmasq to load the blocklist
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/dnsmasq.d/blocklist.conf
+    content: |
+      # Load an additional hosts file for blocking websites.
+      addn-hosts={{ dns_blackhole_blocklist_path }}
+    mode: '0644'
+    backup: true
+  notify: restart NetworkManager
+
+- name: Verify NetworkManager is running
+  become: true
+  ansible.builtin.systemd:
+    name: NetworkManager.service
+    state: started
+    enabled: true

@@ -1,0 +1,80 @@
+---
+# Reference: https://stackoverflow.com/questions/55844981/ansible-insert-word-in-grub-cmdline
+- name: Check if GRUB splash exists in boot command
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX=".*splash'
+    state: absent
+  check_mode: true
+  register: grub_cmdline_check
+  changed_when: false
+
+- name: Add kernel boot parameters (verbose logging, ACPI, etc.)
+  become: true
+  ansible.builtin.lineinfile:
+    backup: true
+    backrefs: true
+    path: /etc/default/grub
+    regexp: "^(GRUB_CMDLINE_LINUX=\".*)\"$"
+    line: '\1 noquiet splash=verbose acpi_backlight=video "'
+    state: present
+  when: grub_cmdline_check.found == 0
+  notify: Update GRUB
+
+- name: Change GRUB timeout to 0
+  become: true
+  ansible.builtin.replace:
+    backup: true
+    path: /etc/default/grub
+    regexp: '^GRUB_TIMEOUT=[1-9][0-9]*'
+    replace: "GRUB_TIMEOUT=0"
+  notify: Update GRUB
+
+# https://wiki.archlinux.org/title/Getty#Have_boot_messages_stay_on_tty1
+- name: Keep boot messages on tty1
+  block:
+
+    - name: Ensure Getty directory exists
+      become: true
+      ansible.builtin.file:
+        path: /etc/systemd/system/getty@tty1.service.d/
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Keep boot messages on tty1
+      become: true
+      ansible.builtin.blockinfile:
+        path: /etc/systemd/system/getty@tty1.service.d/noclear.conf
+        create: true
+        mode: '0644'
+        marker: '# {mark} systemd_noclear_rc'
+        state: present
+        block: |
+          [Service]
+          TTYVTDisallocate=no
+
+- name: Install brightnessctl pkg
+  become: true
+  when: ansible_facts["distribution"] == "Archlinux"
+  ansible.builtin.package:
+    name: brightnessctl
+    state: present
+
+- name: Add user to video group
+  become: true
+  ansible.builtin.user:
+    name: '{{ ansible_user }}'
+    groups: video
+    append: true
+    state: present
+
+- name: Add udev rule for brightness control
+  become: true
+  ansible.builtin.copy:
+    content: |
+      SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+    dest: /etc/udev/rules.d/90-backlight.rules
+    mode: '0644'

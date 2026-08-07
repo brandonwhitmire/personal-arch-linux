@@ -1,0 +1,25 @@
+---
+# rofi role - application launcher
+# This role installs and configures rofi as an application launcher with Dracula theme
+
+- name: Install rofi package
+  become: true
+  ansible.builtin.package:
+    name:
+      - rofi  # application launcher and window switcher
+    state: present
+
+- name: Ensure rofi config directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/rofi/
+    state: directory
+    mode: '0755'
+
+- name: Download Dracula theme for rofi
+  become: false
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/dracula/rofi/master/theme/config1.rasi
+    dest: ~/.config/rofi/config.rasi
+    mode: '0644'
+    force: true

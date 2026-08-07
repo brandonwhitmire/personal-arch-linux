@@ -1,0 +1,277 @@
+---
+# !!! === Do NOT DELETE (configures VM guest instead of host) === !!!
+# https://wiki.archlinux.org/index.php/VirtualBox/Install_Arch_Linux_as_a_guest
+
+- name: Check for virtualization (VM running inside any hypervisor)
+  become: true
+  changed_when: false
+  ignore_errors: true
+  ansible.builtin.shell: |
+    # Try multiple methods to detect virtualization
+    if command -v dmidecode >/dev/null 2>&1; then
+      # Check DMI information for virtualization indicators
+      if dmidecode | grep --ignore-case --quiet --extended-regexp 'virtualbox|vbox|vmware|qemu|kvm|xen|parallels|hyper-v|bhyve'; then
+        exit 0
+      fi
+    fi
+
+    # Check system files for virtualization indicators
+    if [ -f /sys/class/dmi/id/product_name ]; then
+      if grep --ignore-case --quiet --extended-regexp 'virtualbox|vbox|vmware|qemu|kvm|xen|parallels|hyper-v|bhyve' /sys/class/dmi/id/product_name; then
+        exit 0
+      fi
+    fi
+
+    if [ -f /sys/class/dmi/id/sys_vendor ]; then
+      if grep --ignore-case --quiet --extended-regexp 'vmware|qemu|kvm|xen|parallels|microsoft|bhyve' /sys/class/dmi/id/sys_vendor; then
+        exit 0
+      fi
+    fi
+
+    # Check CPU info for virtualization indicators
+    if [ -f /proc/cpuinfo ]; then
+      if grep --ignore-case --quiet --extended-regexp 'virtualbox|vbox|vmware|qemu|kvm|xen|parallels|hyper-v|bhyve' /proc/cpuinfo; then
+        exit 0
+      fi
+    fi
+
+    # Check for virtualization-specific kernel modules
+    if lsmod | grep --quiet --extended-regexp 'vboxguest|vmw_vmci|virtio|kvm|xen'; then
+      exit 0
+    fi
+
+    # Check for virtualization-specific processes
+    if pgrep --quiet --extended-regexp 'vboxservice|vmware|qemu|kvm'; then
+      exit 0
+    fi
+
+    # If no virtualization detected, exit with failure
+    exit 1
+  register: virtualization_is_virtualized
+
+- name: Detect specific virtualization type
+  become: true
+  changed_when: false
+  ignore_errors: true
+  ansible.builtin.shell: |
+    # Determine the specific type of virtualization
+    if command -v dmidecode >/dev/null 2>&1; then
+      if dmidecode | grep --ignore-case --quiet 'virtualbox\|vbox'; then
+        echo "virtualbox"
+      elif dmidecode | grep --ignore-case --quiet 'vmware'; then
+        echo "vmware"
+      elif dmidecode | grep --ignore-case --quiet 'qemu\|kvm'; then
+        echo "qemu"
+      elif dmidecode | grep --ignore-case --quiet 'xen'; then
+        echo "xen"
+      elif dmidecode | grep --ignore-case --quiet 'parallels'; then
+        echo "parallels"
+      elif dmidecode | grep --ignore-case --quiet 'hyper-v\|microsoft'; then
+        echo "hyperv"
+      elif dmidecode | grep --ignore-case --quiet 'bhyve'; then
+        echo "bhyve"
+      else
+        echo "unknown"
+      fi
+    else
+      # Fallback detection methods
+      if lsmod | grep --quiet 'vboxguest'; then
+        echo "virtualbox"
+      elif lsmod | grep --quiet 'vmw_vmci'; then
+        echo "vmware"
+      elif lsmod | grep --quiet 'kvm\|virtio'; then
+        echo "qemu"
+      elif lsmod | grep --quiet 'xen'; then
+        echo "xen"
+      else
+        echo "unknown"
+      fi
+    fi
+  register: virtualization_type
+  when: virtualization_is_virtualized.rc == 0
+
+- name: Set virtualization status facts
+  ansible.builtin.set_fact:
+    virtualization_is_virtualized_guest: "{{ virtualization_is_virtualized.rc == 0 }}"
+    virtualization_platform: "{{ virtualization_type.stdout | default('unknown') }}"
+
+- name: === Host (hypervisor) actions ===
+  when: not virtualization_is_virtualized_guest
+  block:
+
+    # https://wiki.archlinux.org/title/VirtualBox
+    - name: --- Virtualbox ---
+      when: virtualization_vbox | bool
+      block:
+
+        - name: Install virtualbox pkgs
+          become: true
+          ansible.builtin.package:
+            name:
+              - virtualbox
+              - virtualbox-host-modules-arch
+            state: present
+
+        # https://wiki.archlinux.org/title/VirtualBox#Accessing_host_USB_devices_in_guest
+        - name: Add user to vboxusers group
+          become: true
+          ansible.builtin.user:
+            name: '{{ ansible_user }}'
+            groups: vboxusers
+            append: true
+            state: present
+
+        # https://wiki.archlinux.org/title/VirtualBox#Load_the_VirtualBox_kernel_modules
+        - name: Enable VirtualBox kernel modules
+          become: true
+          community.general.modprobe:
+            name: '{{ item }}'
+            state: present
+          loop:
+            - vboxdrv
+            - vboxnetadp
+            - vboxnetflt
+
+    # https://wiki.archlinux.org/title/QEMU
+    - name: --- QEMU ---
+      when: virtualization_qemu | bool
+      block:
+
+        - name: Install qemu pkgs
+          become: true
+          ansible.builtin.package:
+            name:
+              - qemu-full
+            state: present
+
+- name: === Guest (virtual machines) actions ===
+  when: virtualization_is_virtualized_guest
+  block:
+
+    # VirtualBox Guest specific actions
+    - name: --- VirtualBox Guest ---
+      when: virtualization_platform == 'virtualbox'
+      block:
+
+        - name: Remove conflicting package
+          become: true
+          ansible.builtin.package:
+            name:
+              - virtualbox-guest-utils-nox
+            state: absent
+
+        - name: Install Virtualbox Guest and NFS customizations
+          become: true
+          ansible.builtin.package:
+            name:
+              - virtualbox-guest-utils
+              - nfs-utils
+            state: present
+
+        - name: Enable Guest Additions and NFS services
+          become: true
+          ansible.builtin.service:
+            name: '{{ item }}'
+            state: started
+            enabled: true
+          loop:
+            - vboxservice
+            - rpcbind
+
+        - name: Add `{{ ansible_user }}` to vboxsf group
+          become: true
+          ansible.builtin.user:
+            name: '{{ ansible_user }}'
+            groups: vboxsf
+            append: true
+            state: present
+
+        # https://wiki.archlinux.org/title/VirtualBox/Install_Arch_Linux_as_a_guest#Launch_the_VirtualBox_guest_services
+        - name: Run VBox guest services on start
+          ansible.builtin.lineinfile:
+            path: ~/.config/i3/config
+            line: exec_always VBoxClient-all
+            create: true
+            mode: '0755'
+            state: present
+
+    # VMware Guest specific actions
+    - name: --- VMware Guest ---
+      when: virtualization_platform == 'vmware'
+      block:
+
+        - name: Install VMware Guest tools
+          become: true
+          ansible.builtin.package:
+            name:
+              - open-vm-tools
+            state: present
+
+        - name: Enable VMware Guest services
+          become: true
+          ansible.builtin.service:
+            name: '{{ item }}'
+            state: started
+            enabled: true
+          loop:
+            - vmtoolsd
+            - vmware-vmblock-fuse
+
+    # QEMU/KVM Guest specific actions
+    - name: --- QEMU/KVM Guest ---
+      when: virtualization_platform in ['qemu', 'kvm']
+      block:
+
+        - name: Install QEMU Guest tools
+          become: true
+          ansible.builtin.package:
+            name:
+              - qemu-guest-agent
+            state: present
+
+        - name: Enable QEMU Guest Agent service
+          become: true
+          ansible.builtin.service:
+            name: qemu-guest-agent
+            state: started
+            enabled: true
+          failed_when: false
+          register: virtualization_qemu_guest_agent_service_result
+
+        - name: Check QEMU Guest Agent service status
+          become: true
+          ansible.builtin.service:
+            name: qemu-guest-agent
+            state: started
+          when: virtualization_qemu_guest_agent_service_result is failed
+          failed_when: false
+
+    # Generic virtualization actions
+    - name: --- Generic Virtualization ---
+      block:
+
+        - name: Install common virtualization tools
+          become: true
+          ansible.builtin.package:
+            name:
+              - spice-vdagent
+              - spice-protocol
+            state: present
+
+        - name: Check if spice-vdagent service is already running
+          become: true
+          ansible.builtin.systemd:
+            name: spice-vdagentd
+          register: virtualization_spice_vdagent_status
+          changed_when: false
+          failed_when: false
+
+        - name: Enable spice-vdagent service
+          become: true
+          ansible.builtin.systemd:
+            name: spice-vdagentd
+            state: started
+            enabled: true
+            daemon_reload: false
+          when: not virtualization_spice_vdagent_status.status.ActiveState == "active"
+          failed_when: false

@@ -1,0 +1,31 @@
+---
+# Install nitrogen (wallpaper manager)
+- name: Install nitrogen from AUR
+  vars:
+    function_yay_aur_packages:
+      - nitrogen
+    function_yay_aur_packages_state: present
+  ansible.builtin.import_role:
+    name: function_yay
+
+- name: Ensure wallpaper directory exists
+  become: true
+  ansible.builtin.file:
+    path: /usr/share/backgrounds/1_PERSONAL_WALLPAPERS/
+    state: directory
+    mode: '0755'
+
+- name: Copy wallpapers to target
+  become: true
+  ansible.builtin.copy:
+    remote_src: false
+    src: files/wallpapers/
+    dest: /usr/share/backgrounds/1_PERSONAL_WALLPAPERS/
+    mode: '0755'
+
+- name: Copy nitrogen config to target
+  ansible.builtin.copy:
+    remote_src: false
+    src: files/bg-saved.cfg
+    dest: ~/.config/nitrogen/
+    mode: '0755'

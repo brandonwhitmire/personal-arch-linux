@@ -1,0 +1,27 @@
+---
+- name: Prepare and configure all hosts
+  hosts: all
+  roles:
+    - baseline
+    - arch_recommendations
+    - ufw_firewall
+    - dns_blackhole
+    - rofi
+    # - dmenu  # replaced by rofi
+    - polybar
+    # - i3status  # replaced by polybar
+    - i3
+    - dunst
+    - shell
+    - theme
+    - conky
+    - nitrogen
+    - keepassxc
+    - powertop
+    - locale
+    - docker
+    - grub
+    - calibre
+    - virtualization
+    - vagrant
+    - nvidia

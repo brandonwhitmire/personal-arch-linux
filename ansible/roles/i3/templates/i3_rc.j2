@@ -1,0 +1,318 @@
+# i3 config file (v4)
+# Please see https://i3wm.org/docs/userguide.html for a complete reference!
+
+#----------------------------------------------------------------#
+# Variables
+#----------------------------------------------------------------#
+# Set mod key (Mod1=<Alt>, Mod4=<Super>)
+set $mod Mod4
+
+# Set terminal and other applications
+set $terminal alacritty
+set $launcher {{ i3_launcher_command }}
+set $menu morc_menu
+set $powermenu ~/.config/i3/scripts/powermenu.sh
+
+#----------------------------------------------------------------#
+# Visuals & Look and Feel
+#----------------------------------------------------------------#
+# Font for window titles. Will also be used by the bar unless a different font
+# is used in the bar {} block below.
+# Use "pango:" to enable support for icons and special characters.
+# Make sure you have a Nerd Font installed (e.g., JetBrainsMono Nerd Font)
+font pango:JetBrainsMono Nerd Font 12
+
+# Configure border style <normal|1pixel|pixel xx|none|pixel>
+default_border normal
+default_floating_border normal
+hide_edge_borders none
+
+# change borders
+bindsym $mod+u border none
+bindsym $mod+y border pixel 1
+bindsym $mod+n border normal
+
+# Gaps
+gaps inner 6
+gaps outer -1
+smart_gaps on
+
+#----------------------------------------------------------------#
+# Keybindings
+#----------------------------------------------------------------#
+# Use Mouse+$mod to drag floating windows
+floating_modifier $mod
+
+# start a terminal
+bindsym $mod+Return exec $terminal
+
+# kill focused window
+bindsym $mod+Shift+q kill
+
+# start program launcher
+bindsym $mod+d exec --no-startup-id $launcher
+
+# launch categorized menu
+bindsym $mod+z exec --no-startup-id $menu
+
+# Shortcut for pavucontrol
+bindsym $mod+Shift+m exec pavucontrol
+
+# Screen brightness controls
+bindsym XF86MonBrightnessUp exec brightnessctl set +5%
+bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
+
+# Start Applications
+bindsym $mod+Ctrl+b exec $terminal -e /usr/bin/bmenu
+bindsym $mod+F1 exec /usr/bin/galculator
+bindsym $mod+F2 exec "notify-send --expire-time 10000 '🌐 Launching Web Browser' ; /usr/bin/firefox"
+bindsym $mod+F3 exec --no-startup-id /usr/bin/pcmanfm
+bindsym $mod+F4 exec "notify-send --expire-time 10000 '🔐 KeePassXC Launched' ; /usr/bin/keepassxc"
+bindsym $mod+F5 exec /usr/bin/virt-manager
+
+# Screenshots
+bindsym $mod+Print --release exec --no-startup-id "flameshot screen && notify-send '📸 Screenshot taken'"
+bindsym $mod+Shift+Print --release exec --no-startup-id "flameshot gui && notify-send '📸 Screenshot area selected'"
+
+# Click & Kill Window/Program
+bindsym $mod+Ctrl+x --release exec --no-startup-id xkill
+
+# Dunst management
+bindsym $mod+Shift+d --release exec "killall dunst ; exec notify-send 'Dunst Restarted'"
+
+# mouse behavior
+focus_follows_mouse yes
+mouse_warping none
+
+# change focus (vim-style)
+bindsym $mod+j focus down
+bindsym $mod+k focus up
+bindsym $mod+l focus right
+bindsym $mod+semicolon focus left
+
+# alternatively, you can use the cursor keys:
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+bindsym $mod+Left focus left
+
+# move focused window (vim-style)
+bindsym $mod+Shift+j move down
+bindsym $mod+Shift+k move up
+bindsym $mod+Shift+l move right
+bindsym $mod+Shift+semicolon move left
+
+# alternatively, you can use the cursor keys:
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+bindsym $mod+Shift+Left move left
+
+# split orientation
+bindsym $mod+h split h ; exec notify-send 'Tile Horizontally'
+bindsym $mod+v split v ; exec notify-send 'Tile Vertically'
+bindsym $mod+q split toggle ; exec notify-send 'Tile Toggled'
+
+# change container layout (stacked, tabbed, toggle split)
+bindsym $mod+s layout stacking ; exec notify-send 'Layout: Stacked'
+bindsym $mod+w layout tabbed ; exec notify-send 'Layout: Tabbed'
+bindsym $mod+e layout toggle split ; exec notify-send 'Layout: Split'
+
+# toggle tiling / floating
+bindsym $mod+Shift+space floating toggle
+
+# change focus between tiling / floating windows
+bindsym $mod+space focus mode_toggle
+
+# toggle sticky
+bindsym $mod+Shift+s sticky toggle
+
+# focus the parent container
+bindsym $mod+a focus parent
+
+#----------------------------------------------------------------#
+# Scratchpad
+#----------------------------------------------------------------#
+# move the currently focused window to the scratchpad
+bindsym $mod+Shift+minus move scratchpad
+
+# Show the next scratchpad window or hide the focused scratchpad window.
+bindsym $mod+minus scratchpad show
+
+#----------------------------------------------------------------#
+# Workspaces
+#----------------------------------------------------------------#
+# Workspace names with Nerd Font icons
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+
+# switch to workspace
+bindsym $mod+1 workspace number $ws1
+bindsym $mod+2 workspace number $ws2
+bindsym $mod+3 workspace number $ws3
+bindsym $mod+4 workspace number $ws4
+bindsym $mod+5 workspace number $ws5
+bindsym $mod+6 workspace number $ws6
+bindsym $mod+7 workspace number $ws7
+bindsym $mod+8 workspace number $ws8
+
+# Move focused container to workspace
+bindsym $mod+Ctrl+1 move container to workspace number $ws1
+bindsym $mod+Ctrl+2 move container to workspace number $ws2
+bindsym $mod+Ctrl+3 move container to workspace number $ws3
+bindsym $mod+Ctrl+4 move container to workspace number $ws4
+bindsym $mod+Ctrl+5 move container to workspace number $ws5
+bindsym $mod+Ctrl+6 move container to workspace number $ws6
+bindsym $mod+Ctrl+7 move container to workspace number $ws7
+bindsym $mod+Ctrl+8 move container to workspace number $ws8
+
+# Move to workspace with focused container
+bindsym $mod+Shift+1 move container to workspace number $ws1; workspace number $ws1
+bindsym $mod+Shift+2 move container to workspace number $ws2; workspace number $ws2
+bindsym $mod+Shift+3 move container to workspace number $ws3; workspace number $ws3
+bindsym $mod+Shift+4 move container to workspace number $ws4; workspace number $ws4
+bindsym $mod+Shift+5 move container to workspace number $ws5; workspace number $ws5
+bindsym $mod+Shift+6 move container to workspace number $ws6; workspace number $ws6
+bindsym $mod+Shift+7 move container to workspace number $ws7; workspace number $ws7
+bindsym $mod+Shift+8 move container to workspace number $ws8; workspace number $ws8
+
+# workspace back and forth (with/without active container)
+workspace_auto_back_and_forth yes
+bindsym $mod+b workspace back_and_forth
+bindsym $mod+Shift+b move container to workspace back_and_forth; workspace back_and_forth
+
+#navigate workspaces next / previous
+bindsym $mod+Ctrl+Right workspace next
+bindsym $mod+Ctrl+Left workspace prev
+
+#----------------------------------------------------------------#
+# Window Rules
+#----------------------------------------------------------------#
+# Assign applications to specific workspaces
+for_window [class="(?i).*steam.*$"] move container to workspace number $ws1
+for_window [class="(?i)\.exe$"] move container to workspace number $ws2
+
+# Open specific applications in floating mode
+for_window [class="Galculator"] floating enable, border pixel 1
+for_window [class="Pavucontrol"] floating enable
+
+for_window [urgent=latest] focus, move to workspace current
+
+#----------------------------------------------------------------#
+# Modes (Resize, Gaps, System)
+#----------------------------------------------------------------#
+# Resize mode
+bindsym $mod+r mode "resize"
+mode "resize" {
+    bindsym j resize shrink width 5 px or 5 ppt
+    bindsym k resize grow height 5 px or 5 ppt
+    bindsym l resize shrink height 5 px or 5 ppt
+    bindsym semicolon resize grow width 5 px or 5 ppt
+    bindsym Left resize shrink width 5 px or 5 ppt
+    bindsym Down resize grow height 5 px or 5 ppt
+    bindsym Up resize shrink height 5 px or 5 ppt
+    bindsym Right resize grow width 5 px or 5 ppt
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+
+# Gaps mode
+bindsym $mod+Shift+g mode "gaps"
+
+mode "gaps" {
+    bindsym o mode "gaps_outer"
+    bindsym i mode "gaps_inner"
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+
+mode "gaps_outer" {
+    bindsym plus gaps outer current plus 5
+    bindsym minus gaps outer current minus 5
+    bindsym 0 gaps outer current set 0
+    bindsym Shift+plus gaps outer all plus 5
+    bindsym Shift+minus gaps outer all minus 5
+    bindsym Shift+0 gaps outer all set 0
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+
+mode "gaps_inner" {
+    bindsym plus gaps inner current plus 5
+    bindsym minus gaps inner current minus 5
+    bindsym 0 gaps inner current set 0
+    bindsym Shift+plus gaps inner all plus 5
+    bindsym Shift+minus gaps inner all minus 5
+    bindsym Shift+0 gaps inner all set 0
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+
+# System Control (replaces old mode with a script)
+bindsym $mod+0 exec --no-startup-id $powermenu
+
+#----------------------------------------------------------------#
+# i3 bar
+#----------------------------------------------------------------#
+{% if i3_status_bar == 'i3status' %}
+bar {
+    i3bar_command i3bar
+    status_command ~/.config/i3status/i3status-wrapper.sh
+    position top
+    tray_output primary
+    font pango:JetBrainsMono Nerd Font 12
+
+    colors {
+        background #282a36
+        statusline #f8f8f2
+        separator  #44475a
+
+        # border background text
+        focused_workspace  #bd93f9 #bd93f9 #282a36
+        active_workspace   #44475a #44475a #f8f8f2
+        inactive_workspace #282a36 #282a36 #6272a4
+        urgent_workspace   #ff5555 #ff5555 #f8f8f2
+        binding_mode       #44475a #44475a #f8f8f2
+    }
+}
+
+# hide/unhide i3status bar
+bindsym $mod+m bar mode toggle
+{% endif %}
+
+#----------------------------------------------------------------#
+# Colors and Theme
+#----------------------------------------------------------------#
+# class                 border  backgr. text    indic.   child_border
+client.focused          #bd93f9 #bd93f9 #282a36 #bd93f9
+client.focused_inactive #44475a #44475a #f8f8f2 #44475a
+client.unfocused        #282a36 #282a36 #6272a4 #282a36
+client.urgent           #ff5555 #ff5555 #f8f8f2 #ff5555
+client.placeholder      #282a36 #282a36 #f8f8f2 #282a36
+client.background       #282a36
+
+#----------------------------------------------------------------#
+# System & Session
+#----------------------------------------------------------------#
+# reload the configuration file
+bindsym $mod+Shift+c reload
+
+# restart i3 inplace
+bindsym $mod+Shift+r restart
+
+# exit i3
+bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -b 'Yes, exit i3' 'i3-msg exit'"
+
+exec --no-startup-id systemctl --user import-environment DISPLAY XAUTHORITY && dbus-update-activation-environment --systemd DISPLAY XAUTHORITY
+exec --no-startup-id xfsettingsd
+# Autostart applications via script
+exec --no-startup-id ~/.config/i3/scripts/autostart.sh
+
+# Lock Workspace 2 to the Primary (external) monitor
+workspace 2 output primary

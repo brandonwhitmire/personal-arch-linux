@@ -1,0 +1,5 @@
+---
+# Default variables for arch_recommendations role
+
+# SSH key configuration
+arch_recommendations_ssh_key_path: ~/.ssh/id_ed25519

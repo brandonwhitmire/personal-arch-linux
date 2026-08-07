@@ -1,0 +1,30 @@
+#!/bin/sh
+
+{% if nvidia_has_gpu is defined and nvidia_has_gpu | bool %}
+# === NVIDIA-ONLY MODE DISPLAY FIX ===
+# This connects the Nvidia renderer (NVIDIA-0) to the Intel display output (modesetting)
+# Required for startx + EnvyControl Nvidia Mode
+if xrandr --listproviders | grep -q "NVIDIA-0"; then
+    xrandr --setprovideroutputsource modesetting NVIDIA-0
+    xrandr --auto
+fi
+# ====================================
+{% endif %}
+
+{% if theme_selected_theme is defined %}
+# === Qt5/6 GTK Theme Configuration ===
+export GTK2_RC_FILES=/usr/share/themes/{{ theme_selected_theme }}/gtk-2.0/gtkrc
+export GTK_THEME={{ theme_selected_theme }}
+export QT_QPA_PLATFORMTHEME=gtk2
+export QT_STYLE_OVERRIDE=gtk2
+{% endif %}
+
+# === Configure displays before starting i3 ===
+hdmi=$(xrandr | grep " connected" | awk '{print $1}' | grep -i HDMI | head -n1)
+edp=$(xrandr | grep " connected" | awk '{print $1}' | grep -i eDP | head -n1)
+[ -n "$edp" ] && xrandr --output "$edp" --auto --pos 0x0
+[ -n "$hdmi" ] && [ -n "$edp" ] && xrandr --output "$hdmi" --auto --primary --right-of "$edp"
+[ -z "$edp" ] && [ -n "$hdmi" ] && xrandr --output "$hdmi" --auto --primary
+
+# Execute i3
+exec i3

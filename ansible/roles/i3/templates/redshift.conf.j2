@@ -1,0 +1,36 @@
+; Redshift configuration file
+; Intensified settings for stronger color temperature adjustment
+
+; Global settings
+[redshift]
+; Location provider: 'geoclue2', 'manual'
+location-provider=manual
+
+; Adjustment method: 'randr', 'vidmode'
+adjustment-method=randr
+
+; Temperature settings (in Kelvin)
+; Daytime temperature (default: 5500K)
+temp-day=5500
+
+; Night temperature - Moderately intensified (default: 3700K, now warmer but not extreme)
+temp-night=2500
+
+; Brightness adjustment (0.1 to 1.0)
+; Lower values = darker screen
+brightness-day=1.0
+brightness-night=0.80
+
+; Gamma adjustment for RGB channels (0.1 to 10.0)
+; Lower values = more intense color shift
+gamma-day=1.0:1.0:1.0
+gamma-night=0.75:0.7:0.65
+
+; Transition settings
+; Fade in/out time in seconds
+fade=1
+
+; Manual location (Ciudad de México / Mexico City)
+[manual]
+lat=19.4326
+lon=-99.1332

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Hack
+Comment=Quick-Dev Environment - Launch development workspace setup
+Exec=/usr/bin/hack
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;Development;
+Keywords=dev;development;workspace;quick;lab;

@@ -1,0 +1,5 @@
+---
+shell_default_browser_name: firefox
+shell_default_browser_fullpath: '/usr/bin/{{ shell_default_browser_name }}'
+shell_default_image_viewer: deepin-image-viewer
+shell_mimeapps_file: ~/.config/mimeapps.list

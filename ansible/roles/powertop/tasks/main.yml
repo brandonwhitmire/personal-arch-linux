@@ -1,0 +1,27 @@
+---
+# This playbook ensures Powertop powersaving mode works
+# Reference:
+# https://wiki.archlinux.org/title/Powertop
+- name: Install Powertop
+  become: true
+  ansible.builtin.package:
+    name:
+      - powertop
+    state: present
+
+- name: Copy Powertop systemd unitfile file to /etc/
+  become: true
+  ansible.builtin.copy:
+    remote_src: false
+    src: powertop.service
+    dest: /etc/systemd/system/
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable powertop service
+  become: true
+  ansible.builtin.service:
+    name: powertop
+    enabled: true
+    state: started

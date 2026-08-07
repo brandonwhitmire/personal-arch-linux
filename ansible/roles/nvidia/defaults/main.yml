@@ -1,0 +1,4 @@
+---
+# NVIDIA kernel boot parameter
+nvidia_drm_modeset_param: "nvidia-drm.modeset=1"
+

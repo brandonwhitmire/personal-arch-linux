@@ -1,0 +1,22 @@
+---
+# dmenu role - isolated launcher role
+# This role installs and configures dmenu as an application launcher
+
+- name: Install AUR pkgs
+  vars:
+    function_yay_aur_packages:
+      - dmenu2  # keyboard-driven app launcher
+  ansible.builtin.import_role:
+    name: function_yay
+
+# Requires dmenu to be installed first
+- name: Install dmenu history patch
+  become: true
+  ansible.builtin.get_url:
+    url: https://tools.suckless.org/dmenu/scripts/dmenu_run_with_command_history/dmenu_run_history
+    dest: /usr/local/bin/
+    checksum: sha256:e46ab822e1809f82f6a71e705087d40ebb95cfb828839b860bccb8904634df09
+    mode: '0755'
+
+
+

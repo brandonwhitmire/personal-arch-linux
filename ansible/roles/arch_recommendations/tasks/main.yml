@@ -1,0 +1,44 @@
+---
+# Arch Linux general recommendations
+# Reference: https://wiki.archlinux.org/title/General_recommendations
+# https://wiki.archlinux.org/title/Security
+- name: === SECURITY BLOCK ===
+  block:
+
+    - name: Install microcode pkg
+      become: true
+      ansible.builtin.package:
+        name:
+          # https://wiki.archlinux.org/title/Microcode
+          - intel-ucode
+        state: present
+
+
+    # https://wiki.archlinux.org/title/OpenSSH#Deny
+    - name: Prevent SSH root login
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: PermitRootLogin no
+        create: true
+        mode: '0440'
+        state: present
+
+- name: === SYSTEM BLOCK ===
+  block:
+
+    - name: Install pacman pkgs
+      become: true
+      ansible.builtin.package:
+        name:
+          - networkmanager
+          - nm-connection-editor
+          - network-manager-applet
+          - networkmanager-openvpn
+
+    - name: Enable NetworkManager service
+      become: true
+      ansible.builtin.service:
+        name: NetworkManager
+        enabled: true
+        state: started

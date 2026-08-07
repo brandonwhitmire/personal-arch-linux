@@ -1,0 +1,24 @@
+#!/usr/bin/bash
+#
+# References:
+# - https://unix.stackexchange.com/questions/533371/how-to-autostart-more-than-one-app-in-different-workspaces-in-i3wm?noredirect=1&lq=1
+# - https://unix.stackexchange.com/questions/96798/i3wm-start-applications-on-specific-workspaces-when-i3-starts#97081
+
+# Expert Quick-Dev Setup
+commands=(
+  "workspace 1; exec /usr/bin/obsidian"
+  # Needs to switch to other monitor
+  "workspace 2; exec /usr/bin/alacritty --working-directory ~/2ndBrain/Projects/1-Website-Content/cyber/"
+  #"workspace 4; exec /usr/bin/virt-manager"
+  #"workspace 5; exec /usr/bin/alacritty --working-directory /tmp"
+  "workspace 7; exec /usr/bin/firefox"
+  "workspace 8; exec /usr/bin/firefox"
+  # Switch back to final spot
+  "workspace 3; exec /usr/bin/firefox"
+)
+
+for cmd in "${commands[@]}"; do
+  i3-msg "$cmd" && sleep 3
+done
+
+notify-send 'Quick-Dev Environment Ready!'

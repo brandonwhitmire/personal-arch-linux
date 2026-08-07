@@ -1,0 +1,7 @@
+---
+- name: Upgrade system (multilib enabled)
+  when: steam_pacman_multilib_enabled is defined and steam_pacman_multilib_enabled.changed
+  become: true
+  ansible.builtin.package:
+    update_cache: true
+    upgrade: true

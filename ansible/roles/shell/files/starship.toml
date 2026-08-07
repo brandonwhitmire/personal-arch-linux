@@ -1,0 +1,80 @@
+# Starship configuration with emoji support
+# https://starship.rs/config/
+
+# Get editor completions based on the config schema
+"$schema" = 'https://starship.rs/config-schema.json'
+
+# Inserts a blank line between shell prompts
+add_newline = true
+
+# Replace the "❯" symbol in the prompt with "➜"
+[character]
+success_symbol = "[➜](bold green)"
+error_symbol = "[❌](bold red)"
+
+# Disable the package module, hiding it from the prompt completely
+[package]
+disabled = true
+
+# Customize the directory prompt
+[directory]
+style = "bold cyan"
+truncation_length = 3
+truncation_symbol = "…/"
+
+# Customize the git branch prompt
+[git_branch]
+symbol = "🌱 "
+style = "bold green"
+
+# Customize the git status prompt
+[git_status]
+conflicted = "🏳"
+ahead = "🏎💨"
+behind = "😰"
+diverged = "😵"
+up_to_date = "✓"
+untracked = "🤷"
+stashed = "📦"
+modified = "📝"
+staged = '[++\($count\)](green)'
+renamed = "👅"
+deleted = "🗑"
+
+# Customize the node.js version prompt
+[nodejs]
+symbol = "⬢ "
+style = "bold green"
+
+# Customize the python version prompt
+[python]
+symbol = "🐍 "
+style = "bold yellow"
+
+# Customize the rust version prompt
+[rust]
+symbol = "🦀 "
+style = "bold red"
+
+# Customize the golang version prompt
+[golang]
+symbol = "🐹 "
+style = "bold cyan"
+
+# Customize the memory usage prompt
+[memory_usage]
+symbol = "🐏 "
+threshold = 70
+style = "bold dimmed red"
+
+# Customize the battery prompt
+[battery]
+full_symbol = "🔋 "
+charging_symbol = "⚡️ "
+discharging_symbol = "💀 "
+
+# Customize the time prompt
+[time]
+disabled = false
+format = "🕐 [$time]($style) "
+style = "bold yellow"

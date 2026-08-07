@@ -1,0 +1,176 @@
+---
+# Various fixes (usually from Proton DB) for Steam Linux games
+#
+# References:
+# - https://wiki.archlinux.org/title/Steam#Proton_Steam-Play
+# - Civ5 launch options: https://www.protondb.com/app/8930#Umnb6VrvAR
+# - Civ6 launch options: https://www.protondb.com/app/289070#GP4yXYME6b
+# https://wiki.archlinux.org/title/Official_repositories#multilib
+- name: Enable pacman multilib
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/pacman.conf
+    marker: "# {mark} pacman_multilib_enable"
+    create: true
+    state: present
+    mode: '0644'
+    block: |
+      [multilib]
+      Include = /etc/pacman.d/mirrorlist
+  register: steam_pacman_multilib_enabled
+  notify: Upgrade system (multilib enabled)
+
+- name: Flush handlers if multilib was enabled (refresh package databases now)
+  ansible.builtin.meta:
+    flush_handlers
+
+# https://wiki.archlinux.org/title/Steam#Installation
+- name: Ensure steam and common deps are installed
+  become: true
+  ansible.builtin.package:
+    name:
+      - lib32-systemd
+      - wine
+      - mesa  # Intel: open-source GPU
+      - ttf-liberation
+      - steam
+    state: present
+    update_cache: true
+
+- name: Ensure certain packages are not installed
+  become: true
+  ansible.builtin.package:
+    name:
+      - lib32-amdvlk
+      - amdvlk
+    state: absent
+
+# https://github.com/GloriousEggroll/proton-ge-custom#native
+- name: === Proton GloriousEggroll Block ===
+  vars:
+    github_repo: GloriousEggroll/proton-ge-custom
+    steam_install_location: '/home/{{ ansible_user }}/.steam/root/compatibilitytools.d'
+  become: false
+  block:
+    - name: Get latest Proton GE release metadata
+      ansible.builtin.uri:
+        url: 'https://api.github.com/repos/{{ github_repo }}/releases/latest'
+        method: GET
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: '2022-11-28'
+          User-Agent: ansible
+      register: steam_latest_release_info
+
+    - name: Set Proton GE version from API
+      ansible.builtin.set_fact:
+        steam_proton_ge_version: '{{ steam_latest_release_info.json.tag_name }}'
+
+    - name: Set Proton GE filename
+      ansible.builtin.set_fact:
+        steam_proton_ge_filename: '{{ steam_proton_ge_version }}.tar.gz'
+
+    - name: Set Proton GE URLs and paths
+      ansible.builtin.set_fact:
+        steam_proton_ge_url: 'https://github.com/{{ github_repo }}/releases/download/{{ steam_proton_ge_version }}/{{ steam_proton_ge_version }}.tar.gz'
+        steam_download_location: '{{ steam_install_location }}/{{ steam_proton_ge_version }}.tar.gz'
+
+    - name: Ensure folder exists
+      ansible.builtin.file:
+        path: '{{ steam_install_location }}'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+        mode: '0755'
+        state: directory
+
+    - name: 'Download Proton GE version: {{ steam_proton_ge_version }}'
+      ansible.builtin.get_url:
+        url: '{{ steam_proton_ge_url }}'
+        dest: '{{ steam_download_location }}'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+        mode: '0755'
+
+    - name: Extract Proton GE archive
+      ansible.builtin.unarchive:
+        remote_src: true
+        src: '{{ steam_download_location }}'
+        dest: '{{ steam_install_location }}'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+        mode: '0755'
+        creates: '{{ steam_install_location }}/{{ steam_proton_ge_version }}'
+
+# Multi Desync: https://www.protondb.com/app/813780#T4QkvqCK-9
+- name: === AOE2 Block ===
+  vars:
+    # Leave this so that the files get placed in the user dir and not /root
+    aoe2_dir: /home/{{ ansible_user }}/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/windows/system32/
+    vc_redist_exe: vc_redist.x64.exe
+    vc_redist_url: https://download.microsoft.com/download/9/3/F/93FCF1E7-E6A4-478B-96E7-D4B285925B00/{{ vc_redist_exe }}
+    vulcan_folder: /usr/share/vulkan/icd.d/
+  become: false
+  block:
+
+    - name: Install necessary pkgs
+      become: true
+      ansible.builtin.package:
+        name:
+          - cabextract
+        state: present
+
+    - name: Ensure proper AOE2 folder exists
+      ansible.builtin.file:
+        path: '{{ aoe2_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Download vc_redist file
+      ansible.builtin.get_url:
+        url: '{{ vc_redist_url }}'
+        dest: '{{ aoe2_dir }}{{ vc_redist_exe }}'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+        mode: '0755'
+        checksum: sha256:5eea714e1f22f1875c1cb7b1738b0c0b1f02aec5ecb95f0fdb1c5171c6cd93a3
+
+    # NOTE: cabextract requires elevation
+    - name: Extract from downloaded file
+      become: true
+      ansible.builtin.command:
+        cmd: cabextract {{ vc_redist_exe }}
+        chdir: '{{ aoe2_dir }}'
+        creates: a10
+
+    # NOTE: cabextract requires elevation
+    - name: Extract from extracted file
+      become: true
+      ansible.builtin.command:
+        cmd: cabextract a10
+        chdir: '{{ aoe2_dir }}'
+        creates: ucrtbase.dll
+
+    - name: Change ownership (chown) to normal user
+      become: true
+      ansible.builtin.file:
+        path: '{{ aoe2_dir }}'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+        recurse: true
+        state: directory
+
+    # Crash after Splash: https://www.protondb.com/app/813780#eoQwQT6ngx
+    - name: Move 1/2 file to fix crash after splash screen
+      become: true
+      ansible.builtin.command:
+        cmd: mv intel_icd.x86_64.json intel_icd.x86_64.json.disabled
+        chdir: '{{ vulcan_folder }}'
+        removes: intel_icd.x86_64.json
+
+    - name: Move 2/2 file to fix crash after splash screen
+      become: true
+      ansible.builtin.command:
+        cmd: mv intel_icd.i686.json intel_icd.i686.json.disabled
+        chdir: '{{ vulcan_folder }}'
+        removes: intel_icd.i686.json
