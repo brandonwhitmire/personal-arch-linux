@@ -15,9 +15,6 @@ dns_blackhole_blocked_domains:
   - nitter.net
   - instagram.com
   - snapchat.com
-  # Video and streaming platforms
-  - vimeo.com
-  - dailymotion.com
   # Image and meme sharing
   - imgur.com
   - 9gag.com
