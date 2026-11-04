@@ -1,0 +1,34 @@
+---
+- name: Set Proton GE download facts
+  ansible.builtin.set_fact:
+    steam_proton_ge_version: "{{ steam_latest_release_info.json.tag_name }}"
+    steam_proton_ge_filename: "{{ steam_latest_release_info.json.tag_name }}.tar.gz"
+    steam_proton_ge_url: >-
+      https://github.com/{{ github_repo }}/releases/download/{{ steam_latest_release_info.json.tag_name }}/{{ steam_latest_release_info.json.tag_name }}.tar.gz
+    steam_download_location: "{{ steam_install_location }}/{{ steam_latest_release_info.json.tag_name }}.tar.gz"
+
+- name: Ensure folder exists
+  ansible.builtin.file:
+    path: '{{ steam_install_location }}'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+    state: directory
+
+- name: Download Proton GE release
+  ansible.builtin.get_url:
+    url: '{{ steam_proton_ge_url }}'
+    dest: '{{ steam_download_location }}'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+
+- name: Extract Proton GE archive
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: '{{ steam_download_location }}'
+    dest: '{{ steam_install_location }}'
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+    mode: '0755'
+    creates: '{{ steam_install_location }}/{{ steam_proton_ge_version }}'

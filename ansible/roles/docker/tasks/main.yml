@@ -14,10 +14,10 @@
     enabled: true
     state: started
 
-- name: 'Add {{ ansible_user }} to docker group'
-  become: true
-  ansible.builtin.user:
-    name: '{{ ansible_user }}'
-    groups: docker
-    append: true
-    state: present
+#- name: 'Add {{ ansible_user }} to docker group'
+#  become: true
+#  ansible.builtin.user:
+#    name: '{{ ansible_user }}'
+#    groups: docker
+#    append: true
+#    state: present

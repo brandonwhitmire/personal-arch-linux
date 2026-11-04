@@ -15,6 +15,11 @@ dns_blackhole_blocked_domains:
   - nitter.net
   - instagram.com
   - snapchat.com
+  - tiktok.com
+  # Video streaming
+  - youtube.com
+  - youtu.be
+  - twitch.tv
   # Image and meme sharing
   - imgur.com
   - 9gag.com
@@ -29,21 +34,15 @@ dns_blackhole_blocked_domains:
   - kiwifarms.net
   - somethingawful.com
   - neogaf.com
-  # Gaming platforms
-  - roblox.com
-  - minecraft.net
-  - epicgames.com
   # News and timewaster sites
-  - nytimes.com/
+  - nytimes.com
+  - foxnews.com
   - upworthy.com
   - huffpost.com
   - vice.com
   - quora.com
   - buzzfeed.com
   - buzzfeednews.com
-  # Image hosting and art communities
-  - flickr.com
-  - photobucket.com
 
 # NetworkManager configuration file path
 dns_blackhole_networkmanager_config: /etc/NetworkManager/conf.d/10-dnsmasq.conf

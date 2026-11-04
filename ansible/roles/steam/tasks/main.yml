@@ -63,44 +63,8 @@
           User-Agent: ansible
       register: steam_latest_release_info
 
-    - name: Set Proton GE version from API
-      ansible.builtin.set_fact:
-        steam_proton_ge_version: '{{ steam_latest_release_info.json.tag_name }}'
-
-    - name: Set Proton GE filename
-      ansible.builtin.set_fact:
-        steam_proton_ge_filename: '{{ steam_proton_ge_version }}.tar.gz'
-
-    - name: Set Proton GE URLs and paths
-      ansible.builtin.set_fact:
-        steam_proton_ge_url: 'https://github.com/{{ github_repo }}/releases/download/{{ steam_proton_ge_version }}/{{ steam_proton_ge_version }}.tar.gz'
-        steam_download_location: '{{ steam_install_location }}/{{ steam_proton_ge_version }}.tar.gz'
-
-    - name: Ensure folder exists
-      ansible.builtin.file:
-        path: '{{ steam_install_location }}'
-        owner: '{{ ansible_user }}'
-        group: '{{ ansible_user }}'
-        mode: '0755'
-        state: directory
-
-    - name: 'Download Proton GE version: {{ steam_proton_ge_version }}'
-      ansible.builtin.get_url:
-        url: '{{ steam_proton_ge_url }}'
-        dest: '{{ steam_download_location }}'
-        owner: '{{ ansible_user }}'
-        group: '{{ ansible_user }}'
-        mode: '0755'
-
-    - name: Extract Proton GE archive
-      ansible.builtin.unarchive:
-        remote_src: true
-        src: '{{ steam_download_location }}'
-        dest: '{{ steam_install_location }}'
-        owner: '{{ ansible_user }}'
-        group: '{{ ansible_user }}'
-        mode: '0755'
-        creates: '{{ steam_install_location }}/{{ steam_proton_ge_version }}'
+    - name: Install Proton GE release
+      ansible.builtin.include_tasks: proton_ge_install.yml
 
 # Multi Desync: https://www.protondb.com/app/813780#T4QkvqCK-9
 - name: === AOE2 Block ===
