@@ -12,8 +12,9 @@
   ansible.builtin.service:
     name: docker
     enabled: true
-    state: started
+#    state: started
 
+# NOTE: this creates a local privilege escalation for the user
 #- name: 'Add {{ ansible_user }} to docker group'
 #  become: true
 #  ansible.builtin.user:

@@ -149,7 +149,7 @@
   failed_when: false
   changed_when: false
   environment:
-    DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"
+    DISPLAY: "{{ ansible_facts['env']['DISPLAY'] | default(':0') }}"
 
 - name: Reload i3 configuration
   become: false
@@ -163,4 +163,4 @@
     - i3_config_changed is defined and i3_config_changed.changed
     - i3_ready is defined and i3_ready.rc == 0
   environment:
-    DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"
+    DISPLAY: "{{ ansible_facts['env']['DISPLAY'] | default(':0') }}"

@@ -2,10 +2,10 @@
 - name: Set Proton GE download facts
   ansible.builtin.set_fact:
     steam_proton_ge_version: "{{ steam_latest_release_info.json.tag_name }}"
-    steam_proton_ge_filename: "{{ steam_latest_release_info.json.tag_name }}.tar.gz"
+    steam_proton_ge_filename: "{{ steam_latest_release_info.json.tag_name }}-x86_64.tar.gz"
     steam_proton_ge_url: >-
-      https://github.com/{{ github_repo }}/releases/download/{{ steam_latest_release_info.json.tag_name }}/{{ steam_latest_release_info.json.tag_name }}.tar.gz
-    steam_download_location: "{{ steam_install_location }}/{{ steam_latest_release_info.json.tag_name }}.tar.gz"
+      https://github.com/{{ github_repo }}/releases/download/{{ steam_latest_release_info.json.tag_name }}/{{ steam_latest_release_info.json.tag_name }}-x86_64.tar.gz
+    steam_download_location: "{{ steam_install_location }}/{{ steam_latest_release_info.json.tag_name }}-x86_64.tar.gz"
 
 - name: Ensure folder exists
   ansible.builtin.file:
