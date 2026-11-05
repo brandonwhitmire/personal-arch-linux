@@ -39,13 +39,16 @@
   ansible.builtin.copy:
     dest: "{{ dns_blackhole_blocklist_path }}"
     content: |
-      # My custom blocklist for productivity
+      # My custom blocklist for productivity (IPv4 + IPv6)
       {% for domain in dns_blackhole_blocked_domains %}
       0.0.0.0 {{ domain }}
       0.0.0.0 www.{{ domain }}
+      :: {{ domain }}
+      :: www.{{ domain }}
       {% endfor %}
     mode: '0644'
     backup: true
+  notify: restart NetworkManager
 
 - name: Create NetworkManager dnsmasq configuration directory
   become: true

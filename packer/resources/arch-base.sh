@@ -7,6 +7,7 @@ set -euo pipefail
 # - Optional keyring refresh (--update-keyring)
 # - Enable encryption with --disk-encryption (use --luks-password to set password)
 # - Interactive (default) and non-interactive (--non-interactive) for Vagrant VMs
+# - Debug trace with --logfile PATH (bash -x plus command output)
 #
 # When `--non-interactive` is used, the installer additionally:
 # - Enables `PasswordAuthentication yes` in `sshd_config`
@@ -24,16 +25,24 @@ set -euo pipefail
 # =========================
 ENCRYPTION=0
 LUKS_PASSWORD=""
+LUKS_PASSWORD_SET=0
 NON_INTERACTIVE=0
 UPDATE_KEYRING=0
 DISK=""
 HOSTNAME="arch"
+HOSTNAME_SET=0
 USERNAME=""
+USERNAME_SET=0
 USERPASS=""
+USERPASS_SET=0
 ROOTPASS=""
+ROOTPASS_SET=0
 VGNAME="vg0"
 LVNAME="root"
 EFI_SIZE_GIB=1
+LOG_DIR=""
+LOG_OUT_PID=""
+LOG_ERR_PID=""
 
 # =========================
 # Helpers
@@ -74,13 +83,73 @@ confirm_or_exit() {
 }
 
 prompt_secret() {
+  # Cosmetic newlines and errors go to stderr. Stdout is only the password:
+  # callers capture it with $(...), and leading newlines from a plain `echo`
+  # would become part of the secret (LUKS then rejects it).
   local prompt="$1" v1 v2
   while true; do
-    read -rs -p "$prompt: " v1; echo
-    read -rs -p "Confirm $prompt: " v2; echo
-    [[ "$v1" == "$v2" ]] && { echo "$v1"; return 0; }
-    echo "Passwords do not match, try again."
+    read -rs -p "$prompt: " v1
+    printf '\n' >&2
+    read -rs -p "Confirm $prompt: " v2
+    printf '\n' >&2
+    if [[ "$v1" == "$v2" ]]; then
+      printf '%s' "$v1"
+      return 0
+    fi
+    echo "Passwords do not match, try again." >&2
   done
+}
+
+cleanup_debug_log() {
+  [[ -n "$LOG_DIR" ]] || return 0
+  set +x
+  unset BASH_XTRACEFD || true
+  # Closing the fifo write ends lets tee flush, including prompts with no newline.
+  if [[ -n "$LOG_OUT_PID" || -n "$LOG_ERR_PID" ]]; then
+    exec 1>&4 2>&5 || true
+    exec 4>&- 5>&- 3>&- || true
+  fi
+  if [[ -n "$LOG_OUT_PID" ]]; then
+    wait "$LOG_OUT_PID" || true
+  fi
+  if [[ -n "$LOG_ERR_PID" ]]; then
+    wait "$LOG_ERR_PID" || true
+  fi
+  command rm -rf "$LOG_DIR"
+  LOG_DIR=""
+  LOG_OUT_PID=""
+  LOG_ERR_PID=""
+}
+
+setup_debug_log() {
+  local logfile="$1"
+  [[ -n "$logfile" ]] || err "--logfile requires a path."
+  command -v stdbuf >/dev/null 2>&1 || err "--logfile requires stdbuf (coreutils)."
+  command -v tee >/dev/null 2>&1 || err "--logfile requires tee."
+  if [[ "$logfile" != /* ]]; then
+    logfile="${PWD}/${logfile}"
+  fi
+  mkdir -p -- "$(dirname "$logfile")" || err "Cannot create directory for log file: $logfile"
+  : > "$logfile" || err "Cannot write log file: $logfile"
+  chmod 600 "$logfile" || err "Cannot set permissions on log file: $logfile"
+  printf '===== arch-base.sh debug log %s =====\n' "$(date -Is)" >> "$logfile"
+
+  LOG_DIR="$(mktemp -d)"
+  trap cleanup_debug_log EXIT
+  mkfifo "$LOG_DIR/out" "$LOG_DIR/err"
+
+  # Save the real terminal fds, then mirror stdout/stderr into the log.
+  exec 4>&1 5>&2
+  stdbuf -o0 -e0 tee -a "$logfile" < "$LOG_DIR/out" >&4 &
+  LOG_OUT_PID=$!
+  stdbuf -o0 -e0 tee -a "$logfile" < "$LOG_DIR/err" >&5 &
+  LOG_ERR_PID=$!
+  exec >"$LOG_DIR/out" 2>"$LOG_DIR/err"
+
+  # bash -x goes to the log only, so interactive prompts stay readable.
+  exec 3>>"$logfile"
+  BASH_XTRACEFD=3
+  set -x
 }
 
 calc_swap_size_mib() {
@@ -111,6 +180,8 @@ Options:
   --root-password PASS          Root password (default: prompt; 'vagrant' in non-interactive).
   --disk-encryption             Enable LUKS + LVM with optional password (encryption disabled by default).
   --luks-password PASS          LUKS password (default: prompt; 'vagrant' in non-interactive).
+  --logfile PATH                Write a bash -x trace and command output to PATH.
+                                The log includes passwords passed to commands.
   -u, --update-keyring          Refresh archlinux-keyring before install.
   -h, --help                    Show this help.
 
@@ -119,20 +190,68 @@ Defaults for --non-interactive:
 EOF
 }
 
+# Enable tracing before the main parse so --logfile covers the whole run.
+# Kept separate from the loop because logging has to be live before later steps.
+_logfile=""
+_logfile_set=0
+_argv=("$@")
+for ((i=0; i<${#_argv[@]}; i++)); do
+  if [[ "${_argv[$i]}" == "--logfile" ]]; then
+    (( i + 1 < ${#_argv[@]} )) || err "--logfile requires a path."
+    _logfile="${_argv[$((i+1))]}"
+    [[ -n "$_logfile" && "$_logfile" != --* ]] || err "--logfile requires a path."
+    _logfile_set=1
+  fi
+done
+unset _argv
+if (( _logfile_set )); then
+  setup_debug_log "$_logfile"
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --non-interactive) NON_INTERACTIVE=1; shift ;;
-    --disk) DISK="${2:-}"; shift 2 ;;
-    --hostname) HOSTNAME="${2:-}"; shift 2 ;;
-    --user) USERNAME="${2:-}"; shift 2 ;;
-    --password) USERPASS="${2:-}"; shift 2 ;;
-    --root-password) ROOTPASS="${2:-}"; shift 2 ;;
-    --disk-encryption) 
+    --disk)
+      [[ $# -ge 2 && "$2" != --* ]] || err "--disk requires a value."
+      DISK="$2"
+      shift 2
+      ;;
+    --hostname)
+      [[ $# -ge 2 && "$2" != --* ]] || err "--hostname requires a value."
+      HOSTNAME="$2"
+      HOSTNAME_SET=1
+      shift 2
+      ;;
+    --user)
+      [[ $# -ge 2 && "$2" != --* ]] || err "--user requires a value."
+      USERNAME="$2"
+      USERNAME_SET=1
+      shift 2
+      ;;
+    --password)
+      [[ $# -ge 2 ]] || err "--password requires a value."
+      USERPASS="$2"
+      USERPASS_SET=1
+      shift 2
+      ;;
+    --root-password)
+      [[ $# -ge 2 ]] || err "--root-password requires a value."
+      ROOTPASS="$2"
+      ROOTPASS_SET=1
+      shift 2
+      ;;
+    --disk-encryption)
       ENCRYPTION=1
       shift
       ;;
     --luks-password)
-      LUKS_PASSWORD="${2:-}"
+      [[ $# -ge 2 ]] || err "--luks-password requires a value."
+      LUKS_PASSWORD="$2"
+      LUKS_PASSWORD_SET=1
+      shift 2
+      ;;
+    --logfile)
+      # Already applied by the pre-scan above.
       shift 2
       ;;
     -u|--update-keyring) UPDATE_KEYRING=1; shift ;;
@@ -158,29 +277,57 @@ if (( NON_INTERACTIVE )); then
   : "${LUKS_PASSWORD:=vagrant}"
 fi
 
-# Interactive prompts
+# Interactive prompts. Values given on the command line are kept;
+# only missing ones are asked for. The disk wipe still requires confirmation.
 if (( ! NON_INTERACTIVE )); then
   info "Interactive mode."
   lsblk -dpno NAME,SIZE,TYPE | grep -E 'disk$' || true
   info "Using disk: $DISK"
   [[ -b "$DISK" ]] || err "Disk not found: $DISK"
-  read -r -p "Hostname [$HOSTNAME]: " _h; HOSTNAME="${_h:-$HOSTNAME}"
-  read -r -p "Create non-root username: " USERNAME
+
+  if (( HOSTNAME_SET )); then
+    info "Using hostname: $HOSTNAME"
+  else
+    read -r -p "Hostname [$HOSTNAME]: " _h
+    HOSTNAME="${_h:-$HOSTNAME}"
+  fi
+  [[ -n "$HOSTNAME" ]] || err "Hostname cannot be empty."
+
+  if (( USERNAME_SET )); then
+    info "Using username: $USERNAME"
+  else
+    read -r -p "Create non-root username: " USERNAME
+  fi
   [[ -n "$USERNAME" ]] || err "Username cannot be empty."
 
   warn "This will WIPE ALL DATA on $DISK and install Arch Linux."
   confirm_or_exit "Final confirmation"
+
   if (( ENCRYPTION )); then
-    info "Full-disk encryption is ENABLED. Use --luks-password to set password."
-    if [[ -z "$LUKS_PASSWORD" ]]; then
+    info "Full-disk encryption is ENABLED."
+    if (( LUKS_PASSWORD_SET )); then
+      info "Using LUKS password from the command line."
+    else
       LUKS_PASSWORD="$(prompt_secret "LUKS encryption password")"
     fi
+    [[ -n "$LUKS_PASSWORD" ]] || err "LUKS password cannot be empty."
   else
-    info "Full-disk encryption is DISABLED by default. Use --disk-encryption to enable."
+    info "Full-disk encryption is DISABLED. Use --disk-encryption to enable."
   fi
 
-  USERPASS="$(prompt_secret "Password for user '$USERNAME'")"
-  ROOTPASS="$(prompt_secret "Password for root")"
+  if (( USERPASS_SET )); then
+    info "Using password for user '$USERNAME' from the command line."
+  else
+    USERPASS="$(prompt_secret "Password for user '$USERNAME'")"
+  fi
+  [[ -n "$USERPASS" ]] || err "User password cannot be empty."
+
+  if (( ROOTPASS_SET )); then
+    info "Using root password from the command line."
+  else
+    ROOTPASS="$(prompt_secret "Password for root")"
+  fi
+  [[ -n "$ROOTPASS" ]] || err "Root password cannot be empty."
 fi
 
 require_root
@@ -232,9 +379,20 @@ mkfs.fat -F32 "$P1"
 ROOT_MAPPER=""
 if (( ENCRYPTION )); then
   info "Setting up LUKS2 on $P2 and LVM inside it..."
-  # LUKS2 container
-  echo -n "${LUKS_PASSWORD}" | cryptsetup luksFormat --type luks1 --force-password "$P2" -
-  echo -n "${LUKS_PASSWORD}" | cryptsetup open "$P2" cryptroot
+  # Format and open must use the same raw key bytes. `open` without --key-file
+  # prompts on the tty and ignores the pipe, which fails with
+  # "No key available with this passphrase". A key file is not newline-terminated;
+  # the boot passphrase prompt strips Enter, so the stored key must not include it.
+  printf '%s' "${LUKS_PASSWORD}" | cryptsetup luksFormat \
+    --batch-mode \
+    --type luks1 \
+    --force-password \
+    --key-file=- \
+    "$P2"
+  printf '%s' "${LUKS_PASSWORD}" | cryptsetup open \
+    --batch-mode \
+    --key-file=- \
+    "$P2" cryptroot
   # LVM inside
   pvcreate /dev/mapper/cryptroot
   vgcreate "$VGNAME" /dev/mapper/cryptroot
