@@ -431,7 +431,15 @@ genfstab -U /mnt >> /mnt/etc/fstab
 # =========================
 # System configuration in chroot
 # =========================
-arch-chroot /mnt /bin/bash -euxo pipefail <<CHROOT
+# Quoted heredoc: values are arguments, not pasted into the script text.
+# Pasting a password into `echo "root:$pass"` makes the inner shell parse
+# quotes, backslashes, and $() in the password, and chpasswd then reads the
+# rest of the script as password lines.
+arch-chroot /mnt /bin/bash -euxo pipefail -s -- "$HOSTNAME" "$USERNAME" "$NON_INTERACTIVE" <<'CHROOT'
+HOSTNAME=$1
+USERNAME=$2
+NON_INTERACTIVE=$3
+
 # Locale
 sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen
@@ -450,17 +458,13 @@ else
 fi
 
 # Hostname and hosts
-echo "$HOSTNAME" > /etc/hostname
-echo "127.0.0.1 localhost" > /etc/hosts
-echo "::1       localhost" >> /etc/hosts
-echo "127.0.1.1 ${HOSTNAME}.localdomain ${HOSTNAME}" >> /etc/hosts
+printf '%s\n' "$HOSTNAME" > /etc/hostname
+printf '%s\n' "127.0.0.1 localhost" > /etc/hosts
+printf '%s\n' "::1       localhost" >> /etc/hosts
+printf '%s\n' "127.0.1.1 ${HOSTNAME}.localdomain ${HOSTNAME}" >> /etc/hosts
 
-# Root password
-echo "root:${ROOTPASS}" | chpasswd
-
-# Create user and set password
-useradd -m -G wheel -s /bin/bash "${USERNAME}"
-echo "${USERNAME}:${USERPASS}" | chpasswd
+# Create the user. The password is applied below, outside this script.
+useradd -m -G wheel -s /bin/bash -- "$USERNAME"
 
 # Secure sudo via /etc/sudoers.d
 if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
@@ -493,6 +497,11 @@ fi
 systemctl enable NetworkManager
 systemctl enable sshd
 CHROOT
+
+# chpasswd's input is "user:password" data. printf passes it through with no
+# second round of shell parsing, so \, ", $, and similar characters stay literal.
+[[ "$ROOTPASS" != *$'\n'* && "$USERPASS" != *$'\n'* ]] || err "Passwords cannot contain a newline."
+printf '%s\n' "root:${ROOTPASS}" "${USERNAME}:${USERPASS}" | arch-chroot /mnt chpasswd
 
 # =========================
 # Initramfs hooks and bootloader
