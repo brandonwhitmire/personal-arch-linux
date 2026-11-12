@@ -1,0 +1,53 @@
+---
+# Firefox and Brave, with extensions installed system-wide through enterprise policy.
+# Firefox: about:policies (ExtensionSettings) then about:addons
+# Brave: brave://policy (ExtensionInstallForcelist) then brave://extensions (managed)
+
+- name: Install Firefox via pacman
+  become: true
+  ansible.builtin.package:
+    name: "{{ browsers_packages_pacman }}"
+    state: present
+
+- name: Install Brave from AUR
+  vars:
+    function_yay_aur_packages: "{{ browsers_packages_aur }}"
+    function_yay_aur_packages_state: present
+  ansible.builtin.import_role:
+    name: function_yay
+
+- name: Ensure Firefox policy directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/firefox/policies
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy Firefox extensions policy
+  become: true
+  ansible.builtin.template:
+    src: firefox_policies.json.j2
+    dest: /etc/firefox/policies/policies.json
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure Brave policy directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/brave/policies/managed
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy Brave extensions policy
+  become: true
+  ansible.builtin.template:
+    src: brave_policies.json.j2
+    dest: /etc/brave/policies/managed/extensions.json
+    owner: root
+    group: root
+    mode: '0644'

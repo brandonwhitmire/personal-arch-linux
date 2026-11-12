@@ -1,0 +1,12 @@
+{
+  "policies": {
+    "ExtensionSettings": {
+{% for key, val in browsers_firefox_extensions.items() %}
+      "{{ key }}": {
+        "installation_mode": "{{ val.installation_mode }}",
+        "install_url": "{{ val.install_url }}"
+      }{% if not loop.last %},{% endif %}
+{% endfor %}
+    }
+  }
+}

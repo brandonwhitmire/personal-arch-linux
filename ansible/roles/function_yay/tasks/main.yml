@@ -24,8 +24,8 @@
 #
 # NOTE:
 # This playbook temporarily adds/removes a passwordless sudo ansible_user
-# when using yay module since yay cannot be ran with sudo
-# but will require (and prompt for sudoer password) later.
+# before makepkg or yay. Both call `sudo pacman` themselves, and that sudo
+# cannot use Ansible's become password or prompt on a fresh install.
 # This is a pretty egrious security hole, but the playbook is written such
 # that it should always remove that hole after packages are installed, removed
 # or failed.
@@ -64,6 +64,20 @@
     - name: Process packages only if some need to be installed
       when: function_yay_packages_to_install | length > 0
       block:
+
+        # makepkg --install and yay both call `sudo pacman` themselves.
+        # Ansible's become password is not forwarded to that sudo, and a fresh
+        # install has no TTY, so passwordless pacman has to exist before the build.
+        - name: 'Add `{{ function_yay_passwordless_sudo_user }}` user to sudoers enabling passwordless `sudo {{ function_yay_passwordless_sudo_program }}`'
+          become: true
+          ansible.builtin.lineinfile:
+            path: '{{ function_yay_passwordless_sudo_file }}'
+            regexp: '^{{ function_yay_passwordless_sudo_user }}\s+ALL=\(ALL\)\s+NOPASSWD:\s+{{ function_yay_passwordless_sudo_program }}$'
+            line: '{{ function_yay_passwordless_sudo_user }} ALL=(ALL) NOPASSWD: {{ function_yay_passwordless_sudo_program }}'
+            create: true
+            validate: 'visudo --check --strict --file=%s'
+            mode: '0440'
+            state: present
 
         - name: Ensure yay dependencies are installed
           become: true
@@ -107,17 +121,6 @@
               ansible.builtin.command: yay --version
               changed_when: false
               when: not function_yay_yay_exists.stat.exists
-
-        - name: 'Add `{{ function_yay_passwordless_sudo_user }}` user to sudoers enabling passwordless `sudo {{ function_yay_passwordless_sudo_program }}`'
-          become: true
-          ansible.builtin.lineinfile:
-            path: '{{ function_yay_passwordless_sudo_file }}'
-            regexp: '^{{ function_yay_passwordless_sudo_user }}\s+ALL=\(ALL\)\s+NOPASSWD:\s+{{ function_yay_passwordless_sudo_program }}$'
-            line: '{{ function_yay_passwordless_sudo_user }} ALL=(ALL) NOPASSWD: {{ function_yay_passwordless_sudo_program }}'
-            create: true
-            validate: 'visudo --check --strict --file=%s'
-            mode: '0440'
-            state: present
 
         - name: 'When package is absent'
           when: '"absent" in function_yay_aur_packages_state'

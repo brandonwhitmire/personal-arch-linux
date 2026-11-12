@@ -368,6 +368,8 @@ borg_backup () {
         --exclude $HOME/.npm \
         --exclude $HOME/.gem \
         --exclude $HOME/.config/chromium \
+        --exclude $HOME/.steam \
+        --exclude $HOME/.local/share/Steam \
         $REPO_BORG::${TODAY}_${EXTRA_TAG} \
         /etc \
         $HOME

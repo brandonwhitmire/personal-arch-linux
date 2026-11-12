@@ -1,0 +1,58 @@
+---
+# System packages
+browsers_packages_pacman:
+  - firefox
+
+browsers_packages_aur:
+  - brave-bin
+
+# Managed via ExtensionSettings in /etc/firefox/policies/policies.json
+browsers_firefox_extensions:
+  # Dark Reader
+  "addon@darkreader.org":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/darkreader/latest.xpi"
+
+  # uBlock Origin
+  "uBlock0@raymondhill.net":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi"
+
+  # Enhancer for YouTube
+  "enhancerforyoutube@maximerf.addons.mozilla.org":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/enhancer-for-youtube/latest.xpi"
+
+  # DF Tube (Distraction Free YouTube)
+  "jid1-CEZVUskUeP05BA@jetpack":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/df-tube-distraction-free/latest.xpi"
+
+  # I don't care about cookies
+  "jid1-KKzOGWgsW3Ao4Q@jetpack":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/i-dont-care-about-cookies/latest.xpi"
+
+  # KeePassXC-Browser (Firefox only)
+  "keepassxc-browser@keepassxc.org":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/keepassxc-browser/latest.xpi"
+
+  # Video DownloadHelper (Firefox only)
+  "{b9db16a4-6edc-47ec-a1f4-b86292ed211d}":
+    installation_mode: "normal_installed"
+    install_url: "https://addons.mozilla.org/firefox/downloads/latest/video-downloadhelper/latest.xpi"
+
+# Managed via ExtensionInstallForcelist in /etc/brave/policies/managed/extensions.json
+# Format: <32-character Chrome Web Store ID>;https://clients2.google.com/service/update2/crx
+browsers_brave_extensions:
+  - id: "eimadpbcbfnmbkopoojfekhnkhdbieeh"
+    name: "Dark Reader"
+  - id: "cjpalhdlnbpafiamejdnhcphjbkeiagm"
+    name: "uBlock Origin"  # Use 'ddkjiahejlhfcafbddmgiahcphecmpfh' for uBlock Origin Lite if preferred
+  - id: "ponfpcnoihfmfllpaingbgckeigkhjaa"
+    name: "Enhancer for YouTube"
+  - id: "mjdepdfccjlamecfdnldghkijihfddec"
+    name: "DF Tube (Distraction Free for YouTube)"
+  - id: "fihnjjcciajhdojfnbdddfaoknhalnja"
+    name: "I don't care about cookies"

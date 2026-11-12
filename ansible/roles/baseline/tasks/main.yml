@@ -18,29 +18,27 @@
 
 - name: Check system update status and perform if needed
   block:
-    - name: Check if system was recently updated
-      become: true
-      ansible.builtin.stat:
-        path: /var/log/pacman.log
-      register: baseline_pacman_log_stat
-
     - name: Get last system update time from pacman log
       become: true
-      ansible.builtin.shell: |
-        set -o pipefail
-        if [ -f /var/log/pacman.log ]; then
-          # Get the last line that contains "starting full system upgrade" or "upgraded"
-          last_upgrade=$(grep -E "(starting full system upgrade|upgraded)" /var/log/pacman.log | tail -1)
-          if [ -n "$last_upgrade" ]; then
-            # Extract timestamp from the first field and remove brackets
-            timestamp=$(echo "$last_upgrade" | awk '{print $1}' | sed 's/\[//;s/\]//')
-            date -d "$timestamp" +%s 2>/dev/null || echo "0"
-          else
-            echo "0"
+      ansible.builtin.shell:
+        executable: /bin/bash
+        cmd: |
+          set -o pipefail
+          log=/var/log/pacman.log
+          if [[ ! -f "$log" ]]; then
+            echo 0
+            exit 0
           fi
-        else
-          echo "0"
-        fi
+          # A fresh install only logs "installed" / "transaction completed".
+          # Matching just "upgraded" misses that and looks like the epoch (1970).
+          line=$(grep -E '^\[[0-9]{4}-[0-9]{2}-[0-9]{2}[T ].*\] \[(PACMAN|ALPM)\] (starting full system upgrade|installed |upgraded |transaction completed)' "$log" | tail -1 || true)
+          stamp=$(printf '%s\n' "$line" | sed -n 's/^\[\([^]]*\)\].*/\1/p')
+          if [[ -n "$stamp" ]] && epoch=$(date -d "$stamp" +%s 2>/dev/null); then
+            echo "$epoch"
+            exit 0
+          fi
+          # Last resort: log mtime. Do not report 0, which is "57 years ago".
+          stat -c %Y "$log"
       register: baseline_last_upgrade_epoch
       changed_when: false
 
@@ -64,7 +62,7 @@
       register: baseline_upgrade_result
       when: baseline_update_needed
 
-    - name: Reboot the VM
+    - name: Reboot system
       become: true
       ansible.builtin.reboot:
         reboot_timeout: 600

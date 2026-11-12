@@ -1,0 +1,7 @@
+{
+  "ExtensionInstallForcelist": [
+{% for ext in browsers_brave_extensions %}
+    "{{ ext.id }};https://clients2.google.com/service/update2/crx"{% if not loop.last %},{% endif %}
+{% endfor %}
+  ]
+}
