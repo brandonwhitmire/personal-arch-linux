@@ -1,0 +1,28 @@
+#!/bin/sh
+# Hyprland quits if the first DRM card it opens has no display. On an
+# Optimus laptop that card is NVIDIA; the panel is wired to Intel.
+# Prefer the firmware boot GPU when it has a connected output.
+if [ -z "$AQ_DRM_DEVICES" ]; then
+    boot=
+    first=
+    for status_file in /sys/class/drm/card*-*/status; do
+        [ -r "$status_file" ] || continue
+        [ "$(cat "$status_file" 2>/dev/null)" = "connected" ] || continue
+        conn=${status_file%/status}
+        name=${conn##*/}
+        card=${name%%-*}
+        dev=/dev/dri/$card
+        [ -e "$dev" ] || continue
+        [ -n "$first" ] || first=$dev
+        bootvga=$(cat "/sys/class/drm/$card/device/boot_vga" 2>/dev/null || true)
+        if [ "$bootvga" = "1" ]; then
+            boot=$dev
+            break
+        fi
+    done
+    chosen=${boot:-$first}
+    if [ -n "$chosen" ]; then
+        export AQ_DRM_DEVICES=$chosen
+    fi
+fi
+exec /usr/bin/start-hyprland "$@"

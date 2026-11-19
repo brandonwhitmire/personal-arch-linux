@@ -48,11 +48,11 @@ browsers_firefox_extensions:
 browsers_brave_extensions:
   - id: "eimadpbcbfnmbkopoojfekhnkhdbieeh"
     name: "Dark Reader"
-  - id: "cjpalhdlnbpafiamejdnhcphjbkeiagm"
-    name: "uBlock Origin"  # Use 'ddkjiahejlhfcafbddmgiahcphecmpfh' for uBlock Origin Lite if preferred
-  - id: "ponfpcnoihfmfllpaingbgckeigkhjaa"
+  - id: "ddkjiahejlhfcafbddmgiahcphecmpfh"
+    name: "uBlock Origin Lite"
+  - id: "ponfpcnoihfmfllpaingbgckeeldkhle"
     name: "Enhancer for YouTube"
-  - id: "mjdepdfccjlamecfdnldghkijihfddec"
-    name: "DF Tube (Distraction Free for YouTube)"
+  - id: "kchgllkpfcggmdaoopkhlkbcokngahlg"
+    name: "DF Tube New (Distraction Free for YouTube)"
   - id: "fihnjjcciajhdojfnbdddfaoknhalnja"
     name: "I don't care about cookies"

@@ -20,15 +20,19 @@ Target: enable SSH (`sudo systemctl enable --now sshd`). Optional: `ssh-copy-id`
 
 ```bash
 source venv/bin/activate
-ansible-playbook archlinux.yml
+ansible-playbook arch_wayland.yml      # Wayland / Hyprland
+ansible-playbook arch_x11.yml          # X11 / i3
 ```
+
+`dev` and `obb` both boot into Hyprland. i3 stays installed and can be chosen from the greeter.
 
 ## Verify
 
 ```bash
-ansible-playbook --syntax-check archlinux.yml
+ansible-playbook --syntax-check arch_wayland.yml
+ansible-playbook --syntax-check arch_x11.yml
 ansible-lint
-ansible-playbook --check archlinux.yml
+ansible-playbook --check arch_wayland.yml
 ```
 
 ## Common commands
@@ -37,7 +41,7 @@ ansible-playbook --check archlinux.yml
 ansible-inventory --list
 ansible-inventory --graph
 
-ansible-playbook --check -vvvvv archlinux.yml
+ansible-playbook --check -vvvvv arch_wayland.yml
 
 ansible all -m debug -a "var=hostvars"
 ```
@@ -48,7 +52,7 @@ Ad-hoc (no inventory file; trailing comma required):
 ANSIBLE_INVENTORY_ENABLED="host_list" ansible-playbook \
   --inventory <HOST>, \
   --extra-vars "ansible_ssh_extra_args='-o StrictHostKeyChecking=no' ansible_user=<USER> ansible_ssh_password=<PASSWORD> ansible_ssh_become_password=<PASSWORD>" \
-  archlinux.yml
+  arch_wayland.yml
 ```
 
 ## End-to-end (Vagrant)

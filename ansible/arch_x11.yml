@@ -1,0 +1,12 @@
+---
+- name: X11 desktop
+  ansible.builtin.import_playbook: arch_baseline.yml
+  vars:
+    baseline_imported: true
+    desktop_session: x11
+    desktop_roles:
+      - rofi
+      - polybar
+      - i3
+      - conky
+      - nitrogen

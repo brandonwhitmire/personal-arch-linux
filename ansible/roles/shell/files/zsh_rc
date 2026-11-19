@@ -346,7 +346,7 @@ borg_backup () {
 	echo $TODAY
     BREAKLINE
 
-    # NOTE: sudo required for reading "/etc"
+    # sudo is required to read /etc and the other accounts under /home
 	sudo borg \
         create \
         --progress \
@@ -360,20 +360,20 @@ borg_backup () {
         --exclude '*.vmdk' \
         --exclude '*box' \
 		--exclude '*.qcow2' \
-        --exclude $HOME/.local \
-        --exclude $HOME/.cache \
-        --exclude $HOME/.vagrant.d \
-        --exclude $HOME/.wine \
-        --exclude $HOME/.yarn \
-        --exclude $HOME/.npm \
-        --exclude $HOME/.gem \
-        --exclude $HOME/.config/chromium \
-        --exclude $HOME/.cursor \
-        --exclude $HOME/.steam \
-        --exclude $HOME/.local/share/Steam \
+        --exclude '/home/*/.local' \
+        --exclude '/home/*/.cache' \
+        --exclude '/home/*/.vagrant.d' \
+        --exclude '/home/*/.wine' \
+        --exclude '/home/*/.yarn' \
+        --exclude '/home/*/.npm' \
+        --exclude '/home/*/.gem' \
+        --exclude '/home/*/.config/chromium' \
+        --exclude '/home/*/.cursor' \
+        --exclude '/home/*/.steam' \
+        --exclude '/home/*/.local/share/Steam' \
         $REPO_BORG::${TODAY}_${EXTRA_TAG} \
         /etc \
-        $HOME
+        /home
 
 	# Finish buffering anything from memory to disk
 	sync
@@ -574,9 +574,33 @@ precmd() {
     fi
 }
 
-# === AUTOSTART XORG ===
+# === AUTOSTART SESSION ===
 # https://wiki.archlinux.org/title/Xinit#Autostart_X_at_login
-# This must come before tmux autostart because it uses exec, which replaces the shell process
-[[ -z $DISPLAY && $XDG_VTNR -eq 1 ]] && exec startx
+# This must come before tmux autostart because it uses exec, which replaces the shell process.
+# ~/.config/desktop-session is "x11" or "wayland", written by the last playbook that finished.
+if [[ -z $DISPLAY && -z $WAYLAND_DISPLAY && $XDG_VTNR -eq 1 ]]; then
+    session_file="$HOME/.config/desktop-session"
+    session=""
+    if [[ -r $session_file ]]; then
+        session="$(<"$session_file")"
+        session="${session//[$' \t\r\n']/}"
+    fi
+    case "$session" in
+        wayland)
+            if [ -x /usr/local/bin/hyprland-session ]; then
+                exec /usr/local/bin/hyprland-session
+            elif command -v start-hyprland >/dev/null 2>&1; then
+                exec start-hyprland
+            elif command -v Hyprland >/dev/null 2>&1; then
+                exec Hyprland
+            fi
+            ;;
+        x11)
+            if command -v startx >/dev/null 2>&1; then
+                exec startx
+            fi
+            ;;
+    esac
+fi
 
 # tmux autostart is managed from the shell role via blockinfile.

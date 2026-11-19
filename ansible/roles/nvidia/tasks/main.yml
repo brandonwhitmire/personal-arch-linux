@@ -3,18 +3,8 @@
 # Handles detection and configuration for NVIDIA GPUs (specifically Pascal and older)
 # Uses nvidia-580xx legacy drivers and envycontrol for GPU switching
 
-- name: Check if Nvidia GPU is present
-  become: false
-  ansible.builtin.shell: |
-    set -o pipefail
-    lspci | grep -i nvidia > /dev/null 2>&1
-  register: nvidia_gpu_check
-  changed_when: false
-  failed_when: false
-
-- name: Set fact for Nvidia GPU presence
-  ansible.builtin.set_fact:
-    nvidia_has_gpu: "{{ nvidia_gpu_check.rc == 0 }}"
+- name: Detect an NVIDIA GPU
+  ansible.builtin.import_tasks: detect.yml
 
 - name: Configure NVIDIA GPU support
   when: nvidia_has_gpu | bool

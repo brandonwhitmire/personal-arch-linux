@@ -1,0 +1,12 @@
+- name: Check if Nvidia GPU is present
+  become: false
+  ansible.builtin.shell: |
+    set -o pipefail
+    lspci | grep -i nvidia > /dev/null 2>&1
+  register: nvidia_gpu_check
+  changed_when: false
+  failed_when: false
+
+- name: Set fact for Nvidia GPU presence
+  ansible.builtin.set_fact:
+    nvidia_has_gpu: "{{ nvidia_gpu_check.rc == 0 }}"

@@ -1,0 +1,6 @@
+show=drun
+width=600
+height=360
+insensitive=true
+prompt=Run
+hide_scroll=true

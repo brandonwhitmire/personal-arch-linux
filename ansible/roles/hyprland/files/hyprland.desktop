@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Hyprland
+Comment=An intelligent dynamic tiling Wayland compositor
+Exec=/usr/local/bin/hyprland-session
+Type=Application
+DesktopNames=Hyprland
+Keywords=tiling;wayland;compositor;
+X-LightDM-Session-Type=wayland

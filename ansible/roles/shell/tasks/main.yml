@@ -32,17 +32,24 @@
       - python-llfuse  # dep for borg backup
       - qbittorrent  # torrent manager
       - nodejs  # dep for coc.nvim
-      - xclip  # dep for vim clipboard
       - galculator  # default calc
       - geckodriver  # used by Selenium for Firefox browsers
       - screenfetch  # display system info
       - socat  # dep for powerline
-      - xorg-xrandr  # dep for powerline
       - ansible-lint  # linter for Ansible
       # - texlive-most  # LaTeX generator dep for vim-latex-live-preview
       - deepin-image-viewer  # simple image viewer
       - starship  # prompt
       - tmux  # terminal multiplexer
+    state: present
+
+- name: Install X11 shell utilities
+  become: true
+  when: desktop_session == 'x11'
+  ansible.builtin.package:
+    name:
+      - xclip  # dep for vim clipboard
+      - xorg-xrandr  # dep for powerline
     state: present
 
 # https://wiki.archlinux.org/title/Powerline
@@ -58,90 +65,104 @@
 #          - neovim  # used by neovim
 
 - name: Add functionality for shells
+  become: true
   ansible.builtin.blockinfile:
-    path: '/home/{{ ansible_user }}/{{ item }}'
+    path: /etc/zsh/zshrc
     marker: "# {mark} zsh_rc"
     block: "{{ lookup('file', 'files/zsh_rc') }}"
     create: true
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
+    owner: root
+    group: root
     mode: '0644'
     state: present
-  loop:
-    - .zshrc
-    # - .bashrc
 
 - name: Add tmux autostart for interactive shells
+  become: true
   ansible.builtin.blockinfile:
-    path: '/home/{{ ansible_user }}/{{ item }}'
+    path: /etc/zsh/zshrc
     marker: '# {mark} tmux_autostart'
     block: |
       # Auto-start tmux for interactive shells.
       if [ -z "$TMUX" ] && [ -n "$PS1" ] && command -v tmux >/dev/null 2>&1; then
           tmux attach-session -t main || tmux new-session -s main
       fi
-    create: true
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
-    mode: '0644'
-    state: present
-  loop:
-    - .zshrc
-    - .bashrc
-
-- name: Copy custom zsh_rc to root
-  become: true
-  ansible.builtin.copy:
-    backup: true
-    remote_src: true
-    src: '/home/{{ ansible_user }}/{{ item }}'
-    dest: '/root/{{ item }}'
     owner: root
     group: root
     mode: '0644'
-  loop:
-    - .zshrc
-    # - .bashrc
+    state: present
 
-- name: Ensure tmux data directory exists
+- name: Point Starship at the system config
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/zsh/zshenv
+    marker: '# {mark} starship_config'
+    block: |
+      export STARSHIP_CONFIG=/etc/starship.toml
+    create: true
+    owner: root
+    group: root
+    mode: '0644'
+    state: present
+
+- name: Find per-user shell files that may contain old blocks
+  become: true
+  ansible.builtin.stat:
+    path: '{{ item }}'
+  loop: "{{ ['/home/dev', '/home/obb', '/home/' + ansible_user, '/root'] | unique | product(['.zshrc', '.bashrc']) | map('join', '/') | list }}"
+  register: shell_user_rc
+
+- name: Remove per-user shell blocks now provided system-wide
+  become: true
+  ansible.builtin.blockinfile:
+    path: '{{ item.0 }}'
+    marker: '{{ item.1 }}'
+    state: absent
+  loop: "{{ shell_user_rc.results | selectattr('stat.exists') | map(attribute='item') | product(['# {mark} zsh_rc', '# {mark} tmux_autostart']) | list }}"
+
+- name: Ensure tmux directories exist for each account
+  become: true
   ansible.builtin.file:
-    path: '/home/{{ ansible_user }}/my_data/tmux_logs'
+    path: '/home/{{ item.0 }}/{{ item.1 }}'
     state: directory
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
+    owner: '{{ item.0 }}'
+    group: '{{ item.0 }}'
     mode: '0755'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique | product(['my_data/tmux_logs', '.tmux', '.tmux/plugins', '.tmux/resurrect']) | list }}"
 
-- name: Ensure tmux config directory exists
-  ansible.builtin.file:
-    path: '/home/{{ ansible_user }}/.tmux'
-    state: directory
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
-    mode: '0755'
-
-- name: Deploy tmux configuration
+- name: Deploy tmux configuration for each account
+  become: true
   ansible.builtin.copy:
     src: files/tmux.conf
-    dest: '/home/{{ ansible_user }}/.tmux.conf'
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
+    dest: '/home/{{ item }}/.tmux.conf'
+    owner: '{{ item }}'
+    group: '{{ item }}'
     mode: '0644'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
-- name: Ensure tmux plugin directory exists
+- name: Give each account ownership of its TPM checkout
+  become: true
   ansible.builtin.file:
-    path: '/home/{{ ansible_user }}/.tmux/plugins'
+    path: '/home/{{ item }}/.tmux/plugins/tpm'
     state: directory
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
-    mode: '0755'
+    owner: '{{ item }}'
+    group: '{{ item }}'
+    recurse: true
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
-- name: Install TPM (tmux plugin manager)
+- name: Install TPM for each account
+  become: true
+  become_user: '{{ item }}'
   ansible.builtin.git:
     repo: https://github.com/tmux-plugins/tpm
-    dest: '/home/{{ ansible_user }}/.tmux/plugins/tpm'
+    dest: '/home/{{ item }}/.tmux/plugins/tpm'
     version: master
+  environment:
+    HOME: '/home/{{ item }}'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
-- name: Install tmux plugins from tmux.conf
+- name: Install tmux plugins for each account
+  become: true
+  become_user: '{{ item }}'
   ansible.builtin.shell: |
     set -e
     tmux start-server
@@ -151,34 +172,28 @@
   args:
     executable: /bin/bash
   environment:
-    TMUX_PLUGIN_MANAGER_PATH: '/home/{{ ansible_user }}/.tmux/plugins/'
+    HOME: '/home/{{ item }}'
+    TMUX_PLUGIN_MANAGER_PATH: '/home/{{ item }}/.tmux/plugins/'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
   changed_when: false
 
-- name: Ensure tmux resurrect directory exists
-  ansible.builtin.file:
-    path: '/home/{{ ansible_user }}/.tmux/resurrect'
-    state: directory
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
-    mode: '0755'
-
-- name: Bootstrap empty tmux resurrection file to suppress restore error
+- name: Bootstrap empty tmux resurrection file for each account
+  become: true
   ansible.builtin.copy:
     content: ""
-    dest: '/home/{{ ansible_user }}/.tmux/resurrect/last'
+    dest: '/home/{{ item }}/.tmux/resurrect/last'
     force: false
-    owner: '{{ ansible_user }}'
-    group: '{{ ansible_user }}'
+    owner: '{{ item }}'
+    group: '{{ item }}'
     mode: '0644'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
-- name: 'Set default shell to zsh for users root and {{ ansible_user }}'
+- name: Set zsh as the login shell for every account
   become: true
   ansible.builtin.user:
     name: '{{ item }}'
     shell: /usr/bin/zsh
-  loop:
-    - '{{ ansible_user }}'
-    - root
+  loop: "{{ ['dev', 'obb', ansible_user, 'root'] | unique }}"
 
 - name: Build pkgfile cache (first time only)
   become: true
@@ -186,49 +201,77 @@
     cmd: pkgfile --update
     creates: /var/cache/pkgfile/
 
-- name: Ensure nvim directory exists
+- name: Ensure nvim directory exists for each account
+  become: true
   ansible.builtin.file:
-    path: ~/.config/nvim/
+    path: '/home/{{ item }}/.config/nvim/'
     state: directory
+    owner: '{{ item }}'
+    group: '{{ item }}'
     mode: '0755'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
 # https://nvchad.com/docs/quickstart/install#install
-- name: 'Clone nvChad to profile: {{ ansible_user }}'  # noqa latest[git]
+- name: Clone nvChad for each account  # noqa latest[git]
+  become: true
+  become_user: '{{ item }}'
   ansible.builtin.git:
     repo: https://github.com/NvChad/starter
-    dest: ~/.config/nvim
-  register: shell_nvchad_cloned
+    dest: '/home/{{ item }}/.config/nvim'
+  environment:
+    HOME: '/home/{{ item }}'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
-- name: Initialize nvim
+- name: Initialize nvim for each account
+  become: true
+  become_user: '{{ item }}'
   ansible.builtin.command:
     cmd: nvim --headless '+qa'
-  when: shell_nvchad_cloned.changed
+  environment:
+    HOME: '/home/{{ item }}'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
   changed_when: false
   failed_when: false
 
-- name: Sync nvim plugins with Lazy
+- name: Sync nvim plugins with Lazy for each account
+  become: true
+  become_user: '{{ item }}'
   ansible.builtin.command:
     cmd: nvim --headless '+lua require("lazy").sync()' '+qa'
+  environment:
+    HOME: '/home/{{ item }}'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
   changed_when: false
   failed_when: false
 
-- name: Install Mason packages
+- name: Install Mason packages for each account
+  become: true
+  become_user: '{{ item }}'
   ansible.builtin.command:
     cmd: nvim --headless '+MasonInstallAll' '+qa'
+  environment:
+    HOME: '/home/{{ item }}'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
   changed_when: false
   failed_when: false
 
-- name: Ensure alacritty directory exists
+- name: Ensure system alacritty config directory exists
+  become: true
   ansible.builtin.file:
-    path: ~/.config/alacritty/
+    path: /etc/alacritty
     state: directory
+    owner: root
+    group: root
     mode: '0755'
 
-- name: Set default font for terminal `alacritty`
+- name: Install system alacritty config
+  become: true
   ansible.builtin.copy:
     force: true
     src: files/alacritty.toml
-    dest: ~/.config/alacritty/alacritty.toml
+    dest: /etc/alacritty/alacritty.toml
+    owner: root
+    group: root
     mode: '0644'
 
 - name: Template /etc/environment
@@ -246,9 +289,10 @@
     owner: root
     group: root
 
-- name: 'Template {{ shell_mimeapps_file }}'
+- name: Install system default applications
+  become: true
   ansible.builtin.blockinfile:
-    path: '{{ shell_mimeapps_file }}'
+    path: /etc/xdg/mimeapps.list
     marker: '# {mark} mimeapps_list_config'
     block: |
       [Default Applications]
@@ -265,14 +309,19 @@
       application/x-extension-xht={{ shell_default_browser_name }}.desktop
       image/jpeg={{ shell_default_image_viewer }}.desktop
       image/png={{ shell_default_image_viewer }}.desktop
+      inode/directory={{ shell_default_file_manager }}.desktop
     create: true
     state: present
     mode: '0644'
+    owner: root
+    group: root
 
-- name: Copy starship configuration
-  become: false
+- name: Install system Starship configuration
+  become: true
   ansible.builtin.copy:
     force: true
     src: files/starship.toml
-    dest: ~/.config/starship.toml
+    dest: /etc/starship.toml
+    owner: root
+    group: root
     mode: '0644'

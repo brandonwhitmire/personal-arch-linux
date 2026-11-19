@@ -1,0 +1,74 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 30,
+    "spacing": 0,
+    "modules-left": ["hyprland/workspaces"],
+    "modules-right": ["network", "disk", "cpu", "memory", "battery", "clock", "tray", "custom/volume"],
+
+    "hyprland/workspaces": {
+        "format": "{name}",
+        "sort-by": "number",
+        "all-outputs": true,
+        "tooltip": false,
+        "on-scroll-up": "hyprctl dispatch workspace m+1",
+        "on-scroll-down": "hyprctl dispatch workspace m-1"
+    },
+
+    "clock": {
+        "format": "{:%a, %d-%b %H:%M}",
+        "format-alt": "{:%A, %d %B %Y}",
+        "tooltip": false
+    },
+
+    "cpu": {
+        "format": "CPU {usage:2}%",
+        "interval": 2
+    },
+
+    "memory": {
+        "format": "MEM {used:0.1f}/{total:0.1f}",
+        "interval": 2
+    },
+
+    "network": {
+        "interval": 3,
+        "format-wifi": "WIFI {ipaddr}",
+        "format-ethernet": "ETH {ipaddr}",
+        "format-disconnected": "not connected",
+        "tooltip-format": "{ifname}"
+    },
+
+    "disk": {
+        "interval": 25,
+        "format": "HDD {used}/{total}",
+        "path": "/"
+    },
+
+    "battery": {
+        "interval": 5,
+        "format": "BAT {capacity}% {time}",
+        "format-charging": "CHR {capacity}% {time}",
+        "format-plugged": "PLUG {capacity}%",
+        "format-full": "PLUG {capacity}%",
+        "states": {
+            "warning": 20,
+            "critical": 10
+        }
+    },
+
+    "custom/volume": {
+        "exec": "/usr/local/lib/waybar/volume.sh",
+        "return-type": "json",
+        "format": "{text}",
+        "interval": 1,
+        "on-click": "pavucontrol",
+        "on-click-middle": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+        "on-scroll-up": "pactl set-sink-volume @DEFAULT_SINK@ +5%",
+        "on-scroll-down": "pactl set-sink-volume @DEFAULT_SINK@ -5%"
+    },
+
+    "tray": {
+        "spacing": 8
+    }
+}

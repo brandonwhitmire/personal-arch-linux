@@ -38,7 +38,9 @@ Debug Packer: `PACKER_LOG=1 ./packer/0_build.sh -on-error=ask`
 cd ansible
 source venv/bin/activate
 ./1_run_first_time_setup.sh
-ansible-playbook archlinux.yml
+ansible-playbook arch_wayland.yml      # Wayland / Hyprland
 ```
+
+`dev` and `obb` both boot into Hyprland. i3 stays installed and can be chosen from the greeter.
 
 See `ansible/README.md` and `packer/README.md`.

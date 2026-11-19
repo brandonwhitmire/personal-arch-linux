@@ -1,0 +1,21 @@
+---
+# dev is the work account and the timed default login.
+# obb is the personal account. This role does not deploy Cursor, AI CLIs, or LLM configs there.
+profiles_wallpaper_dir: /usr/share/backgrounds/profiles
+
+profiles_users:
+  - name: dev
+    groups:
+      - wheel
+      - video
+      - audio
+      - input
+      - autologin
+    wallpaper: wallpaper-dev.jpg
+  - name: obb
+    groups:
+      - wheel
+      - video
+      - audio
+      - input
+    wallpaper: wallpaper-aoe.jpg

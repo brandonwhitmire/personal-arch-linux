@@ -1,0 +1,29 @@
+---
+# Written only after the rest of the play succeeds.
+# desktop_session comes from the playbook that imported arch_baseline.yml.
+
+- name: Check the requested boot session
+  ansible.builtin.assert:
+    that:
+      - desktop_session in ['x11', 'wayland']
+    fail_msg: desktop_session must be x11 or wayland
+
+- name: Ensure each profile config directory exists
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item }}/.config'
+    state: directory
+    owner: '{{ item }}'
+    group: '{{ item }}'
+    mode: '0700'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
+
+- name: Record the boot session
+  become: true
+  ansible.builtin.copy:
+    dest: '/home/{{ item }}/.config/desktop-session'
+    content: "{{ desktop_session }}\n"
+    owner: '{{ item }}'
+    group: '{{ item }}'
+    mode: '0644'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"

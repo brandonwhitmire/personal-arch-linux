@@ -1,0 +1,2 @@
+---
+# X11 packages are installed only when the importing playbook sets desktop_session to x11.

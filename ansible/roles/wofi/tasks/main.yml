@@ -1,0 +1,36 @@
+---
+# Wofi launcher. One system config for every account.
+
+- name: Install wofi package
+  become: true
+  ansible.builtin.package:
+    name:
+      - wofi
+    state: present
+
+- name: Ensure system wofi config directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/xdg/wofi
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install system wofi config
+  become: true
+  ansible.builtin.copy:
+    src: config
+    dest: /etc/xdg/wofi/config
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install system wofi style
+  become: true
+  ansible.builtin.copy:
+    src: style.css
+    dest: /etc/xdg/wofi/style.css
+    owner: root
+    group: root
+    mode: '0644'

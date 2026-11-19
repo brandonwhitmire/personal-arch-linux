@@ -1,0 +1,210 @@
+-- Hyprland 0.57 reads this file. hyprland.conf is no longer loaded.
+-- Blur is off and VFR is on for battery / iGPU use.
+-- Key map follows the i3 config: Mod4, vim-style focus, workspaces 1-8.
+
+local mod = "SUPER"
+local terminal = "alacritty"
+local lib = "/usr/local/lib/hypr"
+local gaps = lib .. "/gaps.sh"
+local wofi = "wofi --conf /etc/xdg/wofi/config --style /etc/xdg/wofi/style.css"
+
+hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
+hl.env("XDG_SESSION_TYPE", "wayland")
+hl.env("QT_QPA_PLATFORM", "wayland")
+hl.env("QT_QPA_PLATFORMTHEME", "gtk2")
+hl.env("QT_STYLE_OVERRIDE", "gtk2")
+hl.env("GTK_THEME", "{{ theme_selected_theme | default('Dracula') }}")
+hl.env("GTK2_RC_FILES", "/usr/share/themes/{{ theme_selected_theme | default('Dracula') }}/gtk-2.0/gtkrc")
+
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
+
+hl.config({
+    general = {
+        gaps_in = 6,
+        gaps_out = 0,
+        border_size = 2,
+        layout = "dwindle",
+        ["col.active_border"] = "rgb(bd93f9)",
+        ["col.inactive_border"] = "rgb(282a36)",
+    },
+    decoration = {
+        rounding = 0,
+        blur = {
+            enabled = false,
+        },
+        shadow = {
+            enabled = false,
+        },
+    },
+    dwindle = {
+        preserve_split = true,
+    },
+    input = {
+        follow_mouse = 1,
+        numlock_by_default = true,
+    },
+    debug = {
+        vfr = true,
+    },
+    misc = {
+        focus_on_activate = true,
+    },
+})
+
+hl.on("hyprland.start", function()
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE")
+    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
+    hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
+    hl.exec_cmd("dunst")
+    hl.exec_cmd("nm-applet")
+    hl.exec_cmd("blueman-applet")
+    hl.exec_cmd("flameshot")
+    hl.exec_cmd("pulseaudio --start")
+    hl.exec_cmd("redshift-gtk")
+    hl.exec_cmd(lib .. "/bar.sh")
+    hl.exec_cmd(lib .. "/wallpaper.sh")
+    hl.exec_cmd(lib .. "/monitors.sh")
+end)
+
+-- Launchers. Super+D is the app menu (rofi -show drun). Super+Z runs a command.
+hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
+hl.bind(mod .. " + D", hl.dsp.exec_cmd(wofi .. " --show drun"))
+hl.bind(mod .. " + Z", hl.dsp.exec_cmd(wofi .. " --show run"))
+hl.bind(mod .. " + SHIFT + Q", hl.dsp.window.close())
+hl.bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("pavucontrol"))
+hl.bind(mod .. " + 0", hl.dsp.exec_cmd(lib .. "/powermenu.sh"))
+
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set +5%"))
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"))
+
+hl.bind(mod .. " + CTRL + B", hl.dsp.exec_cmd(terminal .. " -e /usr/bin/bmenu"))
+hl.bind(mod .. " + F1", hl.dsp.exec_cmd("/usr/bin/galculator"))
+hl.bind(mod .. " + F2", hl.dsp.exec_cmd("notify-send --expire-time 10000 '🌐 Launching Web Browser'; /usr/bin/firefox"))
+hl.bind(mod .. " + F3", hl.dsp.exec_cmd("/usr/bin/pcmanfm"))
+hl.bind(mod .. " + F4", hl.dsp.exec_cmd("notify-send --expire-time 10000 '🔐 KeePassXC Launched'; /usr/bin/keepassxc"))
+hl.bind(mod .. " + F5", hl.dsp.exec_cmd("/usr/bin/virt-manager"))
+
+hl.bind(mod .. " + Print", hl.dsp.exec_cmd("flameshot screen && notify-send '📸 Screenshot taken'"), { release = true })
+hl.bind(mod .. " + SHIFT + Print", hl.dsp.exec_cmd("flameshot gui && notify-send '📸 Screenshot area selected'"), { release = true })
+hl.bind(mod .. " + CTRL + X", hl.dsp.window.kill(), { release = true })
+hl.bind(mod .. " + SHIFT + D", hl.dsp.exec_cmd("killall dunst; dunst &"))
+
+hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+
+local focus = {
+    J = "down",
+    K = "up",
+    L = "right",
+    semicolon = "left",
+    down = "down",
+    up = "up",
+    right = "right",
+    left = "left",
+}
+for key, dir in pairs(focus) do
+    hl.bind(mod .. " + " .. key, hl.dsp.focus({ direction = dir }))
+    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ direction = dir }))
+end
+
+local function tile(message)
+    return function()
+        hl.dispatch(hl.dsp.layout("togglesplit"))
+        hl.dispatch(hl.dsp.exec_cmd("notify-send '" .. message .. "'"))
+    end
+end
+hl.bind(mod .. " + H", tile("Tile Horizontally"))
+hl.bind(mod .. " + V", tile("Tile Vertically"))
+hl.bind(mod .. " + Q", tile("Tile Toggled"))
+
+hl.bind(mod .. " + S", hl.dsp.exec_cmd("hyprctl keyword general:layout master; notify-send 'Layout: Stacked'"))
+hl.bind(mod .. " + W", function()
+    hl.dispatch(hl.dsp.group.toggle())
+    hl.dispatch(hl.dsp.exec_cmd("notify-send 'Layout: Tabbed'"))
+end)
+hl.bind(mod .. " + E", hl.dsp.exec_cmd("hyprctl keyword general:layout dwindle; notify-send 'Layout: Split'"))
+
+hl.bind(mod .. " + SHIFT + space", hl.dsp.window.float())
+hl.bind(mod .. " + space", hl.dsp.window.cycle_next())
+hl.bind(mod .. " + SHIFT + S", hl.dsp.window.pin())
+
+hl.bind(mod .. " + SHIFT + minus", hl.dsp.window.move({ workspace = "special:scratchpad", follow = false }))
+hl.bind(mod .. " + minus", hl.dsp.workspace.toggle_special("scratchpad"))
+
+for i = 1, 8 do
+    hl.bind(mod .. " + " .. i, hl.dsp.focus({ workspace = i }))
+    hl.bind(mod .. " + CTRL + " .. i, hl.dsp.window.move({ workspace = i, follow = false }))
+    hl.bind(mod .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i, follow = true }))
+end
+
+hl.bind(mod .. " + B", hl.dsp.focus({ workspace = "previous" }))
+hl.bind(mod .. " + SHIFT + B", hl.dsp.window.move({ workspace = "previous", follow = true }))
+hl.bind(mod .. " + CTRL + right", hl.dsp.focus({ workspace = "e+1" }))
+hl.bind(mod .. " + CTRL + left", hl.dsp.focus({ workspace = "e-1" }))
+
+hl.window_rule({ match = { class = "(.*[Ss]team.*)" }, workspace = "1" })
+hl.window_rule({ match = { class = "(.*\\.exe)" }, workspace = "2" })
+hl.window_rule({ match = { class = "(Galculator)" }, float = true })
+hl.window_rule({
+    match = { class = "(pavucontrol|org\\.pulseaudio\\.pavucontrol)" },
+    float = true,
+})
+
+hl.bind(mod .. " + U", hl.dsp.exec_cmd("hyprctl keyword general:border_size 0"))
+hl.bind(mod .. " + Y", hl.dsp.exec_cmd("hyprctl keyword general:border_size 1"))
+hl.bind(mod .. " + N", hl.dsp.exec_cmd("hyprctl keyword general:border_size 2"))
+
+hl.bind(mod .. " + R", hl.dsp.submap("resize"))
+hl.define_submap("resize", function()
+    hl.bind("j", hl.dsp.window.resize({ x = -10, y = 0, relative = true }))
+    hl.bind("k", hl.dsp.window.resize({ x = 0, y = 10, relative = true }))
+    hl.bind("l", hl.dsp.window.resize({ x = 0, y = -10, relative = true }))
+    hl.bind("semicolon", hl.dsp.window.resize({ x = 10, y = 0, relative = true }))
+    hl.bind("left", hl.dsp.window.resize({ x = -10, y = 0, relative = true }))
+    hl.bind("down", hl.dsp.window.resize({ x = 0, y = 10, relative = true }))
+    hl.bind("up", hl.dsp.window.resize({ x = 0, y = -10, relative = true }))
+    hl.bind("right", hl.dsp.window.resize({ x = 10, y = 0, relative = true }))
+    hl.bind("escape", hl.dsp.submap("reset"))
+    hl.bind("Return", hl.dsp.submap("reset"))
+end)
+
+local function gap_bind(which, delta)
+    return hl.dsp.exec_cmd(gaps .. " " .. which .. " " .. delta)
+end
+
+hl.bind(mod .. " + SHIFT + G", hl.dsp.submap("gaps"))
+hl.define_submap("gaps", function()
+    hl.bind("o", hl.dsp.submap("gaps_outer"))
+    hl.bind("i", hl.dsp.submap("gaps_inner"))
+    hl.bind("escape", hl.dsp.submap("reset"))
+    hl.bind("Return", hl.dsp.submap("reset"))
+end)
+
+hl.define_submap("gaps_outer", function()
+    hl.bind("equal", gap_bind("out", "+5"))
+    hl.bind("SHIFT + equal", gap_bind("out", "+5"))
+    hl.bind("minus", gap_bind("out", "-5"))
+    hl.bind("SHIFT + minus", gap_bind("out", "-5"))
+    hl.bind("0", gap_bind("out", "0"))
+    hl.bind("SHIFT + 0", gap_bind("out", "0"))
+    hl.bind("escape", hl.dsp.submap("reset"))
+    hl.bind("Return", hl.dsp.submap("reset"))
+end)
+
+hl.define_submap("gaps_inner", function()
+    hl.bind("equal", gap_bind("in", "+5"))
+    hl.bind("SHIFT + equal", gap_bind("in", "+5"))
+    hl.bind("minus", gap_bind("in", "-5"))
+    hl.bind("SHIFT + minus", gap_bind("in", "-5"))
+    hl.bind("0", gap_bind("in", "0"))
+    hl.bind("SHIFT + 0", gap_bind("in", "0"))
+    hl.bind("escape", hl.dsp.submap("reset"))
+    hl.bind("Return", hl.dsp.submap("reset"))
+end)
+
+hl.bind(mod .. " + M", hl.dsp.exec_cmd(lib .. "/bar-toggle.sh"))
+hl.bind(mod .. " + SHIFT + C", hl.dsp.reload_config())
+hl.bind(mod .. " + SHIFT + R", hl.dsp.reload_config())
+hl.bind(mod .. " + SHIFT + E", hl.dsp.exec_cmd(
+    "printf 'Yes, exit Hyprland\\nCancel\\n' | " .. wofi .. " --dmenu -p 'Exit Hyprland?' | grep -q '^Yes' && hyprctl dispatch 'hl.dsp.exit()'"
+))

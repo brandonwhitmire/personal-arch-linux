@@ -1,0 +1,8 @@
+#!/bin/sh
+# LightDM runs this around every session. X11 needs the Xsession script.
+# A Wayland compositor must be the session itself: Xsession talks to an
+# X display, and Hyprland then fails to open the GPU.
+if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+    exec "$@"
+fi
+exec /etc/lightdm/Xsession "$@"

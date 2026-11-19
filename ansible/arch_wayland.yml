@@ -1,0 +1,10 @@
+---
+- name: Wayland desktop
+  ansible.builtin.import_playbook: arch_baseline.yml
+  vars:
+    baseline_imported: true
+    desktop_session: wayland
+    desktop_roles:
+      - wofi
+      - waybar
+      - hyprland

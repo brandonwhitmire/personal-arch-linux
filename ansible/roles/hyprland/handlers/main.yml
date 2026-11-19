@@ -1,0 +1,6 @@
+---
+- name: Reload Hyprland configuration
+  become: false
+  ansible.builtin.command: hyprctl reload
+  changed_when: false
+  failed_when: false

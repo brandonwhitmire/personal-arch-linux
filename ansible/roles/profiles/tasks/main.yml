@@ -1,0 +1,285 @@
+---
+- name: Create profile accounts
+  ansible.builtin.import_tasks: users.yml
+
+- name: Install LightDM and the Slick greeter
+  become: true
+  ansible.builtin.package:
+    name:
+      - lightdm
+      - lightdm-slick-greeter
+      - swaybg
+    state: present
+
+- name: Ensure the shared wallpaper directory exists
+  become: true
+  ansible.builtin.file:
+    path: '{{ profiles_wallpaper_dir }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install shared profile wallpapers
+  become: true
+  ansible.builtin.copy:
+    src: '{{ playbook_dir }}/roles/nitrogen/files/wallpapers/{{ item.wallpaper }}'
+    dest: '{{ profiles_wallpaper_dir }}/{{ item.wallpaper }}'
+    owner: root
+    group: root
+    mode: '0644'
+  loop: '{{ profiles_users }}'
+
+- name: Ensure per-user wallpaper config directories exist
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item.0.name }}/{{ item.1 }}'
+    state: directory
+    owner: '{{ item.0.name }}'
+    group: '{{ item.0.name }}'
+    mode: '0700'
+  loop: '{{ profiles_users | product([".config", ".config/nitrogen"]) | list }}'
+
+- name: Record each user's wallpaper path
+  become: true
+  ansible.builtin.copy:
+    dest: '/home/{{ item.name }}/.config/profile-wallpaper'
+    content: '{{ profiles_wallpaper_dir }}/{{ item.wallpaper }}{{ "\n" }}'
+    owner: '{{ item.name }}'
+    group: '{{ item.name }}'
+    mode: '0644'
+  loop: '{{ profiles_users }}'
+
+- name: Point nitrogen at that user's wallpaper
+  become: true
+  ansible.builtin.template:
+    src: bg-saved.cfg.j2
+    dest: '/home/{{ item.name }}/.config/nitrogen/bg-saved.cfg'
+    owner: '{{ item.name }}'
+    group: '{{ item.name }}'
+    mode: '0644'
+  loop: '{{ profiles_users }}'
+
+- name: Install the session wallpaper helper
+  become: true
+  ansible.builtin.copy:
+    src: profile-wallpaper
+    dest: /usr/local/bin/profile-wallpaper
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the per-user wallpaper service
+  become: true
+  ansible.builtin.copy:
+    src: profile-wallpaper.service
+    dest: /etc/systemd/user/profile-wallpaper.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure the global user service wants directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/systemd/user/default.target.wants
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Enable the wallpaper service for every login
+  become: true
+  ansible.builtin.file:
+    src: /etc/systemd/user/profile-wallpaper.service
+    dest: /etc/systemd/user/default.target.wants/profile-wallpaper.service
+    state: link
+    force: true
+
+- name: Check which desktop sessions are installed
+  become: true
+  ansible.builtin.stat:
+    path: '{{ item }}'
+  loop:
+    - /usr/share/wayland-sessions/hyprland.desktop
+    - /usr/share/wayland-sessions/hyprland-uwsm.desktop
+  register: profiles_sessions
+
+- name: Select Hyprland as the session LightDM enters when the countdown finishes
+  ansible.builtin.set_fact:
+    profiles_autologin_session: '{{ profiles_wayland_session if profiles_wayland_session else "hyprland" }}'
+  vars:
+    profiles_wayland_session: >-
+      {{ 'hyprland' if profiles_sessions.results[0].stat.exists
+         else ('hyprland-uwsm' if profiles_sessions.results[1].stat.exists else '') }}
+
+- name: Default each profile to Hyprland
+  become: true
+  ansible.builtin.copy:
+    dest: '/home/{{ item.name }}/.dmrc'
+    content: |
+      [Desktop]
+      Session={{ profiles_autologin_session }}
+    owner: '{{ item.name }}'
+    group: '{{ item.name }}'
+    mode: '0644'
+  loop: '{{ profiles_users }}'
+
+- name: Ensure the AccountsService user directory exists
+  become: true
+  ansible.builtin.file:
+    path: /var/lib/AccountsService/users
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Record Hyprland as each profile's greeter session
+  become: true
+  ansible.builtin.copy:
+    dest: '/var/lib/AccountsService/users/{{ item.name }}'
+    content: |
+      [User]
+      Session={{ profiles_autologin_session }}
+      SessionType=wayland
+      XSession={{ profiles_autologin_session }}
+      SystemAccount=false
+    owner: root
+    group: root
+    mode: '0600'
+  loop: '{{ profiles_users }}'
+
+- name: Tell AccountsService each profile's session is Hyprland
+  become: true
+  ansible.builtin.shell: |
+    set -eu
+    user="{{ item.name }}"
+    session="{{ profiles_autologin_session }}"
+    command -v busctl >/dev/null 2>&1 || exit 0
+    path=$(busctl call org.freedesktop.Accounts /org/freedesktop/Accounts org.freedesktop.Accounts FindUserByName s "$user" | awk -F'"' '{print $2}')
+    [ -n "$path" ] || exit 0
+    busctl call org.freedesktop.Accounts "$path" org.freedesktop.Accounts.User SetXSession s "$session"
+    busctl call org.freedesktop.Accounts "$path" org.freedesktop.Accounts.User SetSession s "$session" || true
+    busctl call org.freedesktop.Accounts "$path" org.freedesktop.Accounts.User SetSessionType s wayland || true
+  loop: '{{ profiles_users }}'
+  changed_when: false
+  failed_when: false
+
+- name: Ensure the LightDM session cache directory exists
+  become: true
+  ansible.builtin.file:
+    path: /var/cache/lightdm/dmrc
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Cache Hyprland as each profile's LightDM session
+  become: true
+  ansible.builtin.copy:
+    dest: '/var/cache/lightdm/dmrc/{{ item.name }}'
+    content: |
+      [Desktop]
+      Session={{ profiles_autologin_session }}
+    owner: root
+    group: root
+    mode: '0644'
+  loop: '{{ profiles_users }}'
+
+- name: Ensure the LightDM drop-in directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/lightdm/lightdm.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the LightDM NVIDIA session scripts
+  become: true
+  when: nvidia_has_gpu | default(false) | bool
+  ansible.builtin.copy:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - src: display_setup.sh
+      dest: /etc/lightdm/display_setup.sh
+    - src: session-wrapper
+      dest: /etc/lightdm/session-wrapper
+
+- name: Install the LightDM profile drop-in
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/lightdm/lightdm.conf.d/99-profiles.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Seat:*]
+      greeter-session=lightdm-slick-greeter
+      greeter-hide-users=false
+      {% if nvidia_has_gpu | default(false) | bool %}
+      display-setup-script=/etc/lightdm/display_setup.sh
+      session-wrapper=/etc/lightdm/session-wrapper
+      {% endif %}
+      user-session={{ profiles_autologin_session }}
+      autologin-user=dev
+      autologin-user-timeout=10
+      autologin-session={{ profiles_autologin_session }}
+
+- name: Configure LightDM greeter, user list, and timed autologin
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/lightdm/lightdm.conf
+    marker: '# {mark} profiles_lightdm'
+    create: true
+    owner: root
+    group: root
+    mode: '0644'
+    block: |
+      [Seat:*]
+      greeter-session=lightdm-slick-greeter
+      greeter-hide-users=false
+      {% if nvidia_has_gpu | default(false) | bool %}
+      display-setup-script=/etc/lightdm/display_setup.sh
+      session-wrapper=/etc/lightdm/session-wrapper
+      {% endif %}
+      user-session={{ profiles_autologin_session }}
+      autologin-user=dev
+      autologin-user-timeout=10
+      {% if profiles_autologin_session %}
+      autologin-session={{ profiles_autologin_session }}
+      {% endif %}
+
+- name: Remove the LightDM NVIDIA session scripts
+  become: true
+  when: not (nvidia_has_gpu | default(false) | bool)
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - /etc/lightdm/display_setup.sh
+    - /etc/lightdm/session-wrapper
+
+- name: Enable LightDM
+  become: true
+  ansible.builtin.systemd:
+    name: lightdm.service
+    enabled: true
+    daemon_reload: true
+
+- name: Boot to the graphical target
+  become: true
+  ansible.builtin.file:
+    src: /usr/lib/systemd/system/graphical.target
+    dest: /etc/systemd/system/default.target
+    state: link
+    force: true
+
+- name: Remove tty1 passwordless autologin so the greeter is shown
+  become: true
+  ansible.builtin.file:
+    path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    state: absent

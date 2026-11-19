@@ -85,6 +85,64 @@
   ansible.builtin.package:
     name:
       - xdg-user-dirs  # common user dirs
+      - ttf-bitstream-vera  # serif and mono
+      - ttf-dejavu  # Bitstream Vera modified w/more Unicode
+      - ttf-croscore  # Helvetica, Times, and Courier
+      - noto-fonts-emoji  # comprehensive emoji support
+      - polkit  # privs management
+      - dmidecode  # used for checking for virtualization
+      - firefox  # web browser
+      - chromium  # web browser
+      - gedit  # text editor
+      - flameshot  # screenshot
+      - pkgfile  # pkg search from repos
+      - strace  # debugger
+      - bind-tools  # domain resolving
+      - udisks2  # disk mounting
+      - base-devel  # meta package for compiling (e.g. AUR)
+      - git  # repos
+      - python  # Python3
+      - python-pip  # pip package installer
+      - python-setuptools  # Python3 setuptools
+      - ghostwriter  # Markdown editor
+      - obsidian  # notes
+      - hunspell-en_us  # English spellcheck (for ghostwriter)
+      # - libreoffice-still  # office suite of programs
+      - pulseaudio  # PulseAudio
+      - pavucontrol  # PulseAudio GUI for volume
+      - vlc  # multimedia player
+      - packer  # automate VM building
+      - man-db  # manpages program
+      - man-pages  # actual manpages
+      - blueman  # Bluetooth
+      - dialog  # for wifi-menu
+      - netctl  # dep for wifi-menu
+      - net-tools  # ifconfig, netstat, route
+      - pcmanfm  # file explorer GUI
+      - gvfs  # dep for pcmanfm features
+      - unzip  # zip
+      - evince  # PDF viewer
+      - reflector  # update pacman mirrors
+      - bluez  # bluetooth
+      - bluez-utils  # bluetooth utils
+      - pulseaudio-bluetooth  # pulseaudio dep for bluetooth
+      - android-file-transfer  # access files from Android device
+      - linux-headers  # Linux kernel headers
+    state: present
+
+- name: Install baseline AUR pkgs
+  vars:
+    function_yay_aur_packages:
+      - cursor-bin
+    function_yay_aur_packages_state: present
+  ansible.builtin.import_role:
+    name: function_yay
+
+- name: Install X11 baseline pkgs
+  become: true
+  when: desktop_session == 'x11'
+  ansible.builtin.package:
+    name:
       - xorg-xinit  # start GUI
       - xorg-server  # Xorg server
       # - xorg-apps  # Xorg apps (excluded to avoid xorg-xbacklight conflict)
@@ -106,51 +164,10 @@
       - xorg-xwd  # dump an image of an X window
       - xorg-xwud  # display an X window dump
       - xterm  # default terminal
-      - ttf-bitstream-vera  # serif and mono
-      - ttf-dejavu  # Bitstream Vera modified w/more Unicode
-      - ttf-croscore  # Helvetica, Times, and Courier
-      - noto-fonts-emoji  # comprehensive emoji support
       - xss-lock  # xorg locker
-      - polkit  # privs management
-      - dmidecode  # used for checking for virtualization
-      - firefox  # web browser
-      - chromium  # web browser
-      - gedit  # text editor
-      - flameshot  # screenshot
-      - pkgfile  # pkg search from repos
-      - strace  # debugger
-      - bind-tools  # domain resolving
-      - udisks2  # disk mounting
       - arandr  # desktop display configurator
-      - base-devel  # meta package for compiling (e.g. AUR)
-      - git  # repos
-      - python  # Python3
-      - python-pip  # pip package installer
-      - python-setuptools  # Python3 setuptools
       - numlockx  # numlock on at login
-      - ghostwriter  # Markdown editor
-      - hunspell-en_us  # English spellcheck (for ghostwriter)
-      # - libreoffice-still  # office suite of programs
-      - pulseaudio  # PulseAudio
-      - pavucontrol  # PulseAudio GUI for volume
-      - vlc  # multimedia player
-      - packer  # automate VM building
-      - man-db  # manpages program
-      - man-pages  # actual manpages
-      - blueman  # Bluetooth
-      - dialog  # for wifi-menu
-      - netctl  # dep for wifi-menu
-      - pcmanfm  # file explorer GUI
-      - gvfs  # dep for pcmanfm features
-      - unzip  # zip
-      - evince  # PDF viewer
-      - reflector  # update pacman mirrors
-      - bluez  # bluetooth
-      - bluez-utils  # bluetooth utils
-      - pulseaudio-bluetooth  # pulseaudio dep for bluetooth
       - xf86-input-synaptics  # touchpad
-      - android-file-transfer  # access files from Android device
-      - linux-headers  # Linux kernel headers
     state: present
 
 - name: Enable bluetooth service
@@ -208,6 +225,7 @@
 # https://wiki.archlinux.org/title/Touchpad_Synaptics#Frequently_used_options
 - name: Configure touchpad to use sane defaults
   become: true
+  when: desktop_session == 'x11'
   ansible.builtin.copy:
     remote_src: false
     src: files/70-synaptics.conf
@@ -216,17 +234,17 @@
     owner: root
     group: root
 
-- name: Change default sudo prompt timeout
+- name: Share one sudo password ticket across terminals for 15 minutes
   become: true
-  ansible.builtin.lineinfile:
-    path: /etc/sudoers.d/sudo_prompt_timeout
-    line: Defaults timestamp_timeout=15
-    create: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/sudo_prompt_timeout
+    content: |
+      Defaults timestamp_timeout=15
+      Defaults timestamp_type=global
     validate: 'visudo --check --strict --file=%s'
     mode: '0440'
     owner: root
     group: root
-    state: present
 
 - name: Install font configuration for emoji support
   become: true

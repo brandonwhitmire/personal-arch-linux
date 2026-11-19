@@ -1,0 +1,121 @@
+---
+# Hyprland session. Replaces the i3 role for arch_wayland.yml.
+# Boot: agetty autologin -> zsh -> start-hyprland (see the shell role).
+
+- name: Install Hyprland pkgs
+  become: true
+  ansible.builtin.package:
+    name:
+      - hyprland
+      - xdg-desktop-portal-hyprland
+      - polkit-kde-agent
+      - wl-clipboard
+      - swaybg
+      - redshift
+    state: present
+
+- name: Ensure system Hyprland directories exist
+  become: true
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /etc/xdg/hypr
+    - /usr/local/lib/hypr
+
+- name: Install system Hyprland config
+  become: true
+  ansible.builtin.template:
+    src: hyprland.lua.j2
+    dest: /etc/xdg/hypr/hyprland.lua
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Hyprland configuration
+
+- name: Install system Hyprland scripts
+  become: true
+  ansible.builtin.copy:
+    src: '{{ item }}'
+    dest: '/usr/local/lib/hypr/{{ item }}'
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - powermenu.sh
+    - monitors.sh
+    - gaps.sh
+    - bar.sh
+    - bar-toggle.sh
+    - wallpaper.sh
+
+- name: Remove the Polybar wrapper
+  become: true
+  ansible.builtin.file:
+    path: /usr/local/bin/polybar
+    state: absent
+
+- name: Ensure the LightDM session directory exists
+  become: true
+  when: nvidia_has_gpu | default(false) | bool
+  ansible.builtin.file:
+    path: /usr/share/lightdm/sessions
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the Hyprland session launcher
+  become: true
+  when: nvidia_has_gpu | default(false) | bool
+  ansible.builtin.copy:
+    src: hyprland-session
+    dest: /usr/local/bin/hyprland-session
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Register Hyprland as a Wayland session with LightDM
+  become: true
+  when: nvidia_has_gpu | default(false) | bool
+  ansible.builtin.copy:
+    src: hyprland.desktop
+    dest: /usr/share/lightdm/sessions/hyprland.desktop
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Remove the NVIDIA Hyprland session launcher
+  become: true
+  when: not (nvidia_has_gpu | default(false) | bool)
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - /usr/local/bin/hyprland-session
+    - /usr/share/lightdm/sessions/hyprland.desktop
+
+- name: Ensure each account has a Hyprland config directory
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item }}/.config/hypr'
+    state: directory
+    owner: '{{ item }}'
+    group: '{{ item }}'
+    mode: '0700'
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
+
+- name: Point each account at the system Hyprland session
+  become: true
+  ansible.builtin.copy:
+    dest: '/home/{{ item }}/.config/hypr/hyprland.lua'
+    owner: '{{ item }}'
+    group: '{{ item }}'
+    mode: '0644'
+    content: |
+      -- A private config here would hide the system session.
+      dofile("/etc/xdg/hypr/hyprland.lua")
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"

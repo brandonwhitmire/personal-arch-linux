@@ -4,3 +4,5 @@ collections:
   - name: kewlfft.aur  # function: install AUR packages
   - name: community.general
     version: '*'
+  - name: ansible.posix  # /home/shared default ACLs
+    version: '*'

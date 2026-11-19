@@ -1,0 +1,55 @@
+---
+# Waybar status bar. One system config for every account.
+
+- name: Install waybar package
+  become: true
+  ansible.builtin.package:
+    name:
+      - waybar
+    state: present
+
+- name: Ensure system waybar config directory exists
+  become: true
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /etc/xdg/waybar
+    - /usr/local/lib/waybar
+
+- name: Install system waybar config
+  become: true
+  ansible.builtin.copy:
+    src: config.jsonc
+    dest: /etc/xdg/waybar/config.jsonc
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install the Waybar volume script
+  become: true
+  ansible.builtin.copy:
+    src: volume.sh
+    dest: /usr/local/lib/waybar/volume.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install system waybar style
+  become: true
+  ansible.builtin.copy:
+    src: style.css
+    dest: /etc/xdg/waybar/style.css
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Remove per-user Waybar configs that hide the system config
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item.0 }}/.config/waybar/{{ item.1 }}'
+    state: absent
+  loop: "{{ ['dev', 'obb', ansible_user] | unique | product(['config.jsonc', 'config', 'style.css']) | list }}"

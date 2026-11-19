@@ -12,94 +12,76 @@
       - redshift  # screen color temperature adjustment (includes redshift-gtk)
     state: present
 
-# https://wiki.archlinux.org/title/Getty#Virtual_console
-- name: Ensure systemd folder for autologin exists
+- name: Install system xinitrc
   become: true
-  ansible.builtin.file:
-    path: /etc/systemd/system/getty@tty1.service.d/
-    owner: root
-    group: root
-    mode: '0755'
-    state: directory
-
-- name: Systemd unitfile for autologin via agetty
-  become: true
-  ansible.builtin.blockinfile:
-    path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
-    marker: '# {mark} agetty_autologin'
-    block: |
-      [Service]
-      # This empty ExecStart line must be present to ensure autologin works properly
-      ExecStart=
-      ExecStart=-/sbin/agetty --autologin {{ ansible_user }} --noclear %I 38400 linux
-    owner: root
-    group: root
-    mode: '0644'
-    create: true
-    state: present
-
-- name: Create .xinitrc from template
-  become: false
   ansible.builtin.template:
     src: xinitrc.j2
-    dest: ~/.xinitrc
+    dest: /etc/X11/xinit/xinitrc
+    owner: root
+    group: root
     mode: '0755'
     backup: false
 
-- name: Ensure i3 config dir is present
-  become: false
+- name: Ensure system i3 directories exist
+  become: true
   ansible.builtin.file:
-    path: ~/.config/i3/
+    path: '{{ item }}'
     state: directory
+    owner: root
+    group: root
     mode: '0755'
+  loop:
+    - /etc/i3
+    - /usr/local/lib/i3
 
-- name: Copy default i3 file to `{{ ansible_user }}` profile
-  become: false
+- name: Install system i3 config
+  become: true
   ansible.builtin.template:
     src: i3_rc.j2
-    dest: ~/.config/i3/config
+    dest: /etc/i3/config
+    owner: root
+    group: root
     mode: '0644'
     backup: false
   register: i3_config_changed
 
-- name: Ensure i3 scripts directory exists
-  become: false
-  ansible.builtin.file:
-    path: ~/.config/i3/scripts/
-    state: directory
-    mode: '0755'
-
-- name: Copy powermenu script (template)
-  become: false
+- name: Install system i3 powermenu
+  become: true
   ansible.builtin.template:
     force: true
     src: powermenu.sh.j2
-    dest: ~/.config/i3/scripts/powermenu.sh
+    dest: /usr/local/lib/i3/powermenu.sh
+    owner: root
+    group: root
     mode: '0755'
   register: i3_config_changed
 
-- name: Copy autostart script (template)
-  become: false
+- name: Install system i3 autostart
+  become: true
   ansible.builtin.template:
     force: true
     src: autostart.sh.j2
-    dest: ~/.config/i3/scripts/autostart.sh
+    dest: /usr/local/lib/i3/autostart.sh
+    owner: root
+    group: root
     mode: '0755'
   register: i3_config_changed
 
-- name: Ensure redshift config directory exists
-  become: false
+- name: Remove per-user i3 configs that hide the system config
+  become: true
   ansible.builtin.file:
-    path: ~/.config/
-    state: directory
-    mode: '0755'
+    path: '/home/{{ item }}/.config/i3/config'
+    state: absent
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 
-- name: Copy redshift config file (template)
-  become: false
+- name: Install system redshift config
+  become: true
   ansible.builtin.template:
     force: true
     src: redshift.conf.j2
-    dest: ~/.config/redshift.conf
+    dest: /etc/redshift.conf
+    owner: root
+    group: root
     mode: '0644'
 
 - name: Create /usr/bin/hack script (quick lab dev environment)
@@ -130,7 +112,7 @@
 # Validate i3 configuration syntax using i3 built-in check
 - name: Verify i3 configuration syntax
   become: false
-  ansible.builtin.command: i3 -C -c ~/.config/i3/config
+  ansible.builtin.command: i3 -C -c /etc/i3/config
   when: i3_config_changed is defined and i3_config_changed.changed
   changed_when: false
 

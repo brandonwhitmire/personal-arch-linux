@@ -10,34 +10,47 @@
       - pulseaudio  # for volume module
     state: present
 
-- name: Ensure polybar config directory exists
-  become: false
+- name: Ensure system polybar config directory exists
+  become: true
   ansible.builtin.file:
-    path: ~/.config/polybar/
+    path: /etc/polybar
     state: directory
+    owner: root
+    group: root
     mode: '0755'
 
 - name: Clone Dracula theme for polybar  # noqa command-instead-of-module
-  become: false
+  become: true
   ansible.builtin.git:
     repo: https://github.com/dracula/polybar.git
-    dest: ~/.config/polybar/dracula
+    dest: /etc/polybar/dracula
     update: true
   changed_when: false
 
-- name: Create polybar config with Dracula theme
-  become: false
+- name: Create system polybar config with Dracula theme
+  become: true
   ansible.builtin.template:
     src: config.ini.j2
-    dest: ~/.config/polybar/config.ini
+    dest: /etc/polybar/config.ini
+    owner: root
+    group: root
     mode: '0644'
     force: true
 
-- name: Create polybar launch script
-  become: false
+- name: Install system polybar launch script
+  become: true
   ansible.builtin.template:
     src: launch.sh.j2
-    dest: ~/.config/polybar/launch.sh
+    dest: /usr/local/bin/polybar-launch
+    owner: root
+    group: root
     mode: '0755'
     force: true
+
+- name: Remove per-user polybar configs that hide the system config
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item }}/.config/polybar/config.ini'
+    state: absent
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
 

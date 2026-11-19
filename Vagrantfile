@@ -77,7 +77,7 @@ Vagrant.configure("2") do |config|
       ansible.become = true
       ansible.become_user = "root"
       ansible.verbose = false
-      ansible.playbook = "ansible/archlinux.yml"
+      ansible.playbook = "ansible/arch_x11.yml"
       ansible.config_file = "ansible/ansible.cfg"
     end
   end

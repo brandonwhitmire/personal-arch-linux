@@ -1,6 +1,6 @@
 ---
 # rofi role - application launcher
-# This role installs and configures rofi as an application launcher with Dracula theme
+# System config so every account gets the same launcher.
 
 - name: Install rofi package
   become: true
@@ -9,17 +9,28 @@
       - rofi  # application launcher and window switcher
     state: present
 
-- name: Ensure rofi config directory exists
-  become: false
+- name: Ensure system rofi config directory exists
+  become: true
   ansible.builtin.file:
-    path: ~/.config/rofi/
+    path: /etc/xdg/rofi
     state: directory
+    owner: root
+    group: root
     mode: '0755'
 
 - name: Download Dracula theme for rofi
-  become: false
+  become: true
   ansible.builtin.get_url:
     url: https://raw.githubusercontent.com/dracula/rofi/master/theme/config1.rasi
-    dest: ~/.config/rofi/config.rasi
+    dest: /etc/xdg/rofi/config.rasi
+    owner: root
+    group: root
     mode: '0644'
     force: true
+
+- name: Remove per-user rofi configs that hide the system config
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item }}/.config/rofi/config.rasi'
+    state: absent
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"

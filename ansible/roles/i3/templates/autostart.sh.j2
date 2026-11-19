@@ -3,9 +3,6 @@
 # This script is executed by i3 on startup.
 
 # Terminate already running instances of programs
-# Array of programs to kill before restarting
-# Note: i3status is managed by i3 itself (via bar {} block in config) and will be
-#       automatically restarted by i3, so it doesn't need to be launched here
 PROGRAMS_TO_KILL=(
     dunst
     nitrogen
@@ -14,7 +11,7 @@ PROGRAMS_TO_KILL=(
     flameshot
     conky
     polybar
-    i3status
+    waybar
 )
 
 # Kill all programs in the array
@@ -63,13 +60,8 @@ pa-applet &
 xset s 900 5 &
 xss-lock -- sh -c 'exec i3lock -n --ignore-empty-password --color=540853' &
 
-{% if i3_status_bar == 'polybar' %}
 # Launch polybar
-~/.config/polybar/launch.sh &
-{% elif i3_status_bar == 'i3status' %}
-# i3status is automatically launched by i3 via the bar {} block in the config
-# No explicit launch needed here
-{% endif %}
+/usr/local/bin/polybar-launch &
 
 echo "Autostart script finished."
 

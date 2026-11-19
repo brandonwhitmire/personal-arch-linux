@@ -11,7 +11,7 @@ set $mod Mod4
 set $terminal alacritty
 set $launcher {{ i3_launcher_command }}
 set $menu morc_menu
-set $powermenu ~/.config/i3/scripts/powermenu.sh
+set $powermenu /usr/local/lib/i3/powermenu.sh
 
 #----------------------------------------------------------------#
 # Visuals & Look and Feel
@@ -258,35 +258,6 @@ mode "gaps_inner" {
 bindsym $mod+0 exec --no-startup-id $powermenu
 
 #----------------------------------------------------------------#
-# i3 bar
-#----------------------------------------------------------------#
-{% if i3_status_bar == 'i3status' %}
-bar {
-    i3bar_command i3bar
-    status_command ~/.config/i3status/i3status-wrapper.sh
-    position top
-    tray_output primary
-    font pango:JetBrainsMono Nerd Font 12
-
-    colors {
-        background #282a36
-        statusline #f8f8f2
-        separator  #44475a
-
-        # border background text
-        focused_workspace  #bd93f9 #bd93f9 #282a36
-        active_workspace   #44475a #44475a #f8f8f2
-        inactive_workspace #282a36 #282a36 #6272a4
-        urgent_workspace   #ff5555 #ff5555 #f8f8f2
-        binding_mode       #44475a #44475a #f8f8f2
-    }
-}
-
-# hide/unhide i3status bar
-bindsym $mod+m bar mode toggle
-{% endif %}
-
-#----------------------------------------------------------------#
 # Colors and Theme
 #----------------------------------------------------------------#
 # class                 border  backgr. text    indic.   child_border
@@ -312,7 +283,7 @@ bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcu
 exec --no-startup-id systemctl --user import-environment DISPLAY XAUTHORITY && dbus-update-activation-environment --systemd DISPLAY XAUTHORITY
 exec --no-startup-id xfsettingsd
 # Autostart applications via script
-exec --no-startup-id ~/.config/i3/scripts/autostart.sh
+exec --no-startup-id /usr/local/lib/i3/autostart.sh
 
 # Lock Workspace 2 to the Primary (external) monitor
 workspace 2 output primary

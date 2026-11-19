@@ -187,13 +187,21 @@
             state: present
 
         # https://wiki.archlinux.org/title/VirtualBox/Install_Arch_Linux_as_a_guest#Launch_the_VirtualBox_guest_services
+        - name: Check for the system i3 config
+          become: true
+          ansible.builtin.stat:
+            path: /etc/i3/config
+          register: virtualization_i3_config
+
         - name: Run VBox guest services on start
+          become: true
           ansible.builtin.lineinfile:
-            path: ~/.config/i3/config
+            path: /etc/i3/config
             line: exec_always VBoxClient-all
-            create: true
-            mode: '0755'
+            create: false
+            mode: '0644'
             state: present
+          when: virtualization_i3_config.stat.exists
 
     # VMware Guest specific actions
     - name: --- VMware Guest ---

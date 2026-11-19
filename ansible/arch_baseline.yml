@@ -1,0 +1,58 @@
+---
+# Shared desktop play. arch_x11.yml and arch_wayland.yml import this and
+# pass desktop_session plus desktop_roles.
+- name: Prepare and configure all hosts
+  hosts: all
+  pre_tasks:
+    - name: Refuse a direct run of the shared playbook
+      ansible.builtin.assert:
+        that:
+          - baseline_imported | default(false) | bool
+          - desktop_session is defined
+          - desktop_roles is defined
+        fail_msg: >-
+          arch_baseline.yml cannot be run directly.
+          Import it from arch_x11.yml or arch_wayland.yml.
+    - name: Detect an NVIDIA GPU before desktop configuration
+      ansible.builtin.import_role:
+        name: nvidia
+        tasks_from: detect.yml
+    - name: Create profile accounts before desktop configuration
+      ansible.builtin.import_role:
+        name: profiles
+        tasks_from: users.yml
+  roles:
+    - baseline
+    - arch_recommendations
+    - ufw_firewall
+    - dns_blackhole
+    - dunst
+    - shell
+  tasks:
+    - name: Configure the desktop session
+      ansible.builtin.include_role:
+        name: "{{ desktop_role }}"
+      loop: "{{ desktop_roles }}"
+      loop_control:
+        loop_var: desktop_role
+  post_tasks:
+    - name: Apply shared desktop applications
+      ansible.builtin.include_role:
+        name: "{{ shared_role }}"
+      loop_control:
+        loop_var: shared_role
+      loop:
+        - theme
+        - keepassxc
+        - browsers
+        - powertop
+        - locale
+        - docker
+        - grub
+        - calibre
+        - virtualization
+        - vagrant
+        - nvidia
+        - profiles
+    - name: Record the boot session
+      ansible.builtin.import_tasks: tasks/select_desktop_session.yml

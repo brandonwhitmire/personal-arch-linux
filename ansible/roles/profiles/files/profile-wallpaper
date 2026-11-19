@@ -1,0 +1,64 @@
+#!/bin/sh
+# Apply the picture path stored in ~/.config/profile-wallpaper.
+# Wayland keeps swaybg running. X11 uses nitrogen when it is installed.
+
+img=""
+if [ -r "$HOME/.config/profile-wallpaper" ]; then
+    img=$(tr -d '[:space:]' < "$HOME/.config/profile-wallpaper")
+fi
+if [ ! -f "$img" ]; then
+    case "$(id -un)" in
+        dev) img=/usr/share/backgrounds/profiles/wallpaper-dev.jpg ;;
+        obb) img=/usr/share/backgrounds/profiles/wallpaper-aoe.jpg ;;
+        *) img=/usr/share/backgrounds/profiles/wallpaper-dev.jpg ;;
+    esac
+fi
+[ -f "$img" ] || exit 1
+
+uid=$(id -u)
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"
+
+# Prefer a Wayland socket. The greeter's X server can exist first, and
+# taking that path would exit before Hyprland is up.
+pkill -x swaybg 2>/dev/null || true
+
+i=0
+while [ "$i" -lt 60 ]; do
+    if [ -z "$WAYLAND_DISPLAY" ]; then
+        set -- "$XDG_RUNTIME_DIR"/wayland-*
+        if [ -S "$1" ]; then
+            WAYLAND_DISPLAY=$(basename "$1")
+            export WAYLAND_DISPLAY
+        fi
+    fi
+    if [ -n "$WAYLAND_DISPLAY" ] && command -v swaybg >/dev/null 2>&1; then
+        exec swaybg -i "$img" -m fit
+    fi
+    i=$((i + 1))
+    sleep 0.2
+done
+
+if [ -z "$DISPLAY" ] && [ -S /tmp/.X11-unix/X0 ]; then
+    export DISPLAY=:0
+fi
+if [ -n "$DISPLAY" ] && command -v nitrogen >/dev/null 2>&1; then
+    # --head=-1 is the combined desktop and stretches one picture across
+    # every monitor. Zoom each head so the whole picture fits inside it.
+    heads=$(xrandr --listmonitors 2>/dev/null | awk 'NR==1 { gsub(/[^0-9]/, "", $2); print $2 }')
+    case "$heads" in
+        ''|*[!0-9]*) heads=2 ;;
+    esac
+    [ "$heads" -lt 1 ] && heads=1
+    mkdir -p "$HOME/.config/nitrogen"
+    i=0
+    ok=0
+    while [ "$i" -lt "$heads" ]; do
+        if nitrogen --save --set-zoom --set-color='#002A36' --head="$i" "$img"; then
+            ok=1
+        fi
+        i=$((i + 1))
+    done
+    [ "$ok" -eq 1 ] && exit 0
+fi
+
+exit 1

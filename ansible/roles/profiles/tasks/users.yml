@@ -1,0 +1,99 @@
+---
+- name: Ensure account groups exist
+  become: true
+  ansible.builtin.group:
+    name: '{{ item }}'
+    system: true
+    state: present
+  loop:
+    - wheel
+    - video
+    - audio
+    - input
+    - autologin
+
+- name: Create isolated user accounts
+  become: true
+  ansible.builtin.user:
+    name: '{{ item.name }}'
+    groups: '{{ item.groups | join(",") }}'
+    append: true
+    shell: /usr/bin/zsh
+    create_home: true
+    home: '/home/{{ item.name }}'
+    state: present
+  loop: '{{ profiles_users }}'
+
+- name: Restrict home directories to their owners
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item.name }}'
+    state: directory
+    owner: '{{ item.name }}'
+    group: '{{ item.name }}'
+    mode: '0700'
+  loop: '{{ profiles_users }}'
+
+- name: Create the shared-data group
+  become: true
+  ansible.builtin.group:
+    name: shared-data
+    state: present
+
+- name: Add profile accounts to the shared-data group
+  become: true
+  ansible.builtin.user:
+    name: '{{ item.name }}'
+    groups: shared-data
+    append: true
+  loop: '{{ profiles_users }}'
+
+- name: Ensure /home/shared exists and is open
+  become: true
+  ansible.builtin.file:
+    path: /home/shared
+    state: directory
+    owner: root
+    group: shared-data
+    mode: '0777'
+
+- name: Unlock files already in /home/shared
+  become: true
+  ansible.builtin.file:
+    path: /home/shared
+    state: directory
+    mode: '0777'
+    recurse: true
+    follow: false
+
+- name: Grant every user access to files already in /home/shared
+  become: true
+  ansible.posix.acl:
+    path: /home/shared
+    entity: ''
+    etype: '{{ item }}'
+    permissions: rwx
+    default: false
+    recursive: true
+    follow: false
+    state: present
+  loop:
+    - user
+    - group
+    - other
+
+- name: Force all future files in /home/shared to be world read/write/executable
+  become: true
+  ansible.posix.acl:
+    path: /home/shared
+    entity: ''
+    etype: '{{ item }}'
+    permissions: rwx
+    default: true
+    recursive: true
+    follow: false
+    state: present
+  loop:
+    - user
+    - group
+    - other

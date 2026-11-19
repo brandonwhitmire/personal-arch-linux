@@ -9,17 +9,28 @@
       - dunst  # system notifications
     state: present
 
-- name: Ensure dunst config directory exists
-  become: false
+- name: Ensure system dunst config directory exists
+  become: true
   ansible.builtin.file:
-    path: ~/.config/dunst/
+    path: /etc/dunst
     state: directory
+    owner: root
+    group: root
     mode: '0755'
 
-- name: Create dunst config with Dracula dark theme
-  become: false
+- name: Create system dunst config with Dracula dark theme
+  become: true
   ansible.builtin.template:
     src: dunstrc.j2
-    dest: ~/.config/dunst/dunstrc
+    dest: /etc/dunst/dunstrc
+    owner: root
+    group: root
     mode: '0644'
     backup: true
+
+- name: Remove per-user dunst configs that hide the system config
+  become: true
+  ansible.builtin.file:
+    path: '/home/{{ item }}/.config/dunst/dunstrc'
+    state: absent
+  loop: "{{ ['dev', 'obb', ansible_user] | unique }}"
