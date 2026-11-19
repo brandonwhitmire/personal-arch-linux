@@ -1,0 +1,27 @@
+#!/bin/sh
+# LightDM prepends this to the greeter command.
+# The boot greeter still counts down into the default user. A greeter
+# opened while someone is already logged in is a user switch, so the
+# countdown is cancelled and the greeter stays up until someone signs in.
+
+guard=/usr/local/lib/lightdm/no-switch-autologin.so
+
+graphical_user_session() {
+    command -v loginctl >/dev/null 2>&1 || return 1
+    for id in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
+        class=$(loginctl show-session "$id" -p Class --value 2>/dev/null || true)
+        type=$(loginctl show-session "$id" -p Type --value 2>/dev/null || true)
+        state=$(loginctl show-session "$id" -p State --value 2>/dev/null || true)
+        [ "$class" = "user" ] || continue
+        [ "$state" = "active" ] || [ "$state" = "online" ] || continue
+        [ "$type" = "x11" ] || [ "$type" = "wayland" ] || continue
+        return 0
+    done
+    return 1
+}
+
+if [ -f "$guard" ] && graphical_user_session; then
+    export LD_PRELOAD="$guard${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+
+exec "$@"

@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # A power menu script for i3
-# Provides options for Lock, Suspend, Logout, Reboot, and Shutdown
+# Provides options for Lock, Suspend, Switch User, Logout, Reboot, and Shutdown
 # Launcher command
 LAUNCHER="{{ i3_powermenu_launcher }}"
 
 # Options to display in the menu
 # Using standard Unicode emojis for universal compatibility
-OPTIONS="🔒 Lock\n😴 Suspend\n🚪 Logout\n🔄 Reboot\n⏻ Shutdown"
+OPTIONS="🔒 Lock\n😴 Suspend\n👥 Switch User\n🚪 Logout\n🔄 Reboot\n⏻ Shutdown"
 
 # Get the user's choice
 CHOSEN=$(echo -e "$OPTIONS" | $LAUNCHER)
@@ -19,6 +19,12 @@ case "$CHOSEN" in
         ;;
     "😴 Suspend")
         systemctl suspend
+        ;;
+    "👥 Switch User")
+        # Leaves this session running and opens the greeter on another VT.
+        if ! dm-tool switch-to-greeter; then
+            notify-send 'Switch user failed' 'LightDM could not open the greeter.'
+        fi
         ;;
     "🚪 Logout")
         i3-msg exit

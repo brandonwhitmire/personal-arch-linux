@@ -48,52 +48,17 @@
     append: true
   loop: '{{ profiles_users }}'
 
-- name: Ensure /home/shared exists and is open
+- name: Ensure /home/shared exists
   become: true
   ansible.builtin.file:
     path: /home/shared
     state: directory
     owner: root
     group: shared-data
-    mode: '0777'
+    mode: '2775'
 
-- name: Unlock files already in /home/shared
+- name: Share /home/shared through the shared-data group
   become: true
-  ansible.builtin.file:
-    path: /home/shared
-    state: directory
-    mode: '0777'
-    recurse: true
-    follow: false
-
-- name: Grant every user access to files already in /home/shared
-  become: true
-  ansible.posix.acl:
-    path: /home/shared
-    entity: ''
-    etype: '{{ item }}'
-    permissions: rwx
-    default: false
-    recursive: true
-    follow: false
-    state: present
-  loop:
-    - user
-    - group
-    - other
-
-- name: Force all future files in /home/shared to be world read/write/executable
-  become: true
-  ansible.posix.acl:
-    path: /home/shared
-    entity: ''
-    etype: '{{ item }}'
-    permissions: rwx
-    default: true
-    recursive: true
-    follow: false
-    state: present
-  loop:
-    - user
-    - group
-    - other
+  ansible.builtin.script: share-home.sh
+  register: shared_home_perms
+  changed_when: shared_home_perms.stdout | trim == 'changed'

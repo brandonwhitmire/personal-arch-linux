@@ -107,4 +107,16 @@ EOF
     # Clean up temporary file
     rm -f "$ANSIBLE_GROUP_VARS_FILE.tmp"
 fi
+# A vault password file with the executable bit is run as a script.
+if [ -f "$ANSIBLE_VAULT_PASS_FILE" ]; then
+    chmod a-x "$ANSIBLE_VAULT_PASS_FILE"
+fi
+
+# Ansible ignores ansible.cfg when this directory is world-writable, which
+# drops `inventory = hosts` and the playbook then matches no hosts.
+chmod o-w "$ANSIBLE_BASE_DIR"
+if command -v setfacl >/dev/null 2>&1; then
+    setfacl -m o::r-x "$ANSIBLE_BASE_DIR" || true
+fi
+
 echo "[✓] Setup completed successfully!"

@@ -13,11 +13,22 @@
     state: directory
     mode: '0755'
 
-- name: Fix flameshot v14 xdg-portal hang on X11 (use legacy capture path)
+- name: Use the legacy X11 capture path only on X11
   become: false
+  when: desktop_session | default('x11') == 'x11'
   community.general.ini_file:
     path: ~/.config/flameshot/flameshot.ini
     section: General
     option: useX11LegacyScreenshot
     value: "true"
+    mode: '0644'
+
+- name: Use the screenshot portal on Wayland
+  become: false
+  when: desktop_session | default('x11') == 'wayland'
+  community.general.ini_file:
+    path: ~/.config/flameshot/flameshot.ini
+    section: General
+    option: useX11LegacyScreenshot
+    value: "false"
     mode: '0644'

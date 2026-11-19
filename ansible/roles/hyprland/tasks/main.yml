@@ -8,11 +8,37 @@
     name:
       - hyprland
       - xdg-desktop-portal-hyprland
+      # Hyprland's portal no longer implements the Screenshot interface
+      # Flameshot calls. wlr-screencopy is still available, and portal-wlr
+      # serves that one interface.
+      - xdg-desktop-portal-wlr
       - polkit-kde-agent
       - wl-clipboard
       - swaybg
       - redshift
     state: present
+
+- name: Ensure the desktop portal config directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/xdg/xdg-desktop-portal
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Send screenshot requests to the wlr portal
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/xdg/xdg-desktop-portal/hyprland-portals.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [preferred]
+      default=hyprland;gtk
+      org.freedesktop.impl.portal.Screenshot=wlr
+      org.freedesktop.impl.portal.ScreenCast=hyprland
 
 - name: Ensure system Hyprland directories exist
   become: true

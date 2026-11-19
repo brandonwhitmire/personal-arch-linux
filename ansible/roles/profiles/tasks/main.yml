@@ -209,6 +209,52 @@
     - src: session-wrapper
       dest: /etc/lightdm/session-wrapper
 
+- name: Ensure the LightDM helper directories exist
+  become: true
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /usr/local/lib/lightdm
+    - /usr/local/src/lightdm
+
+- name: Install the greeter wrapper used for user switching
+  become: true
+  ansible.builtin.copy:
+    src: greeter-wrapper
+    dest: /etc/lightdm/greeter-wrapper
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the user-switch autologin guard
+  become: true
+  ansible.builtin.copy:
+    src: no-switch-autologin.c
+    dest: /usr/local/src/lightdm/no-switch-autologin.c
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Build the user-switch autologin guard
+  become: true
+  ansible.builtin.shell: |
+    set -eu
+    src=/usr/local/src/lightdm/no-switch-autologin.c
+    out=/usr/local/lib/lightdm/no-switch-autologin.so
+    if [ -f "$out" ] && [ "$out" -nt "$src" ]; then
+      exit 0
+    fi
+    gcc -shared -fPIC -O2 -o "$out" "$src"
+    echo rebuilt
+  args:
+    executable: /bin/bash
+  register: profiles_autologin_guard_build
+  changed_when: profiles_autologin_guard_build.stdout == 'rebuilt'
+
 - name: Install the LightDM profile drop-in
   become: true
   ansible.builtin.copy:
@@ -220,6 +266,9 @@
       [Seat:*]
       greeter-session=lightdm-slick-greeter
       greeter-hide-users=false
+      allow-user-switching=true
+      xserver-share=false
+      greeter-wrapper=/etc/lightdm/greeter-wrapper
       {% if nvidia_has_gpu | default(false) | bool %}
       display-setup-script=/etc/lightdm/display_setup.sh
       session-wrapper=/etc/lightdm/session-wrapper
@@ -242,6 +291,9 @@
       [Seat:*]
       greeter-session=lightdm-slick-greeter
       greeter-hide-users=false
+      allow-user-switching=true
+      xserver-share=false
+      greeter-wrapper=/etc/lightdm/greeter-wrapper
       {% if nvidia_has_gpu | default(false) | bool %}
       display-setup-script=/etc/lightdm/display_setup.sh
       session-wrapper=/etc/lightdm/session-wrapper
