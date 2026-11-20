@@ -39,9 +39,12 @@ window#waybar {
     border-left: 1px solid #6272a4;
 }
 
-#network.disconnected,
-#custom-volume.muted {
+#network.disconnected {
     color: #6272a4;
+}
+
+#custom-volume.muted {
+    color: #ff5555;
 }
 
 #battery.warning,

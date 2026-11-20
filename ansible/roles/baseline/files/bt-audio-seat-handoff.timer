@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically sync Bluetooth audio ownership to the active seat
+
+[Timer]
+OnStartupSec=5
+OnUnitActiveSec=5
+AccuracySec=1s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

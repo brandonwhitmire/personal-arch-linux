@@ -1,0 +1,66 @@
+#!/bin/bash
+# Own BlueZ audio only while this user's graphical seat session is active.
+# The timer calls this every few seconds. Reconnect only on the transition
+# into the active seat, otherwise Bluetooth audio drops on every tick.
+set -euo pipefail
+
+uid="$(id -u)"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${uid}}"
+
+mapfile -t sessions < <(loginctl list-sessions --no-legend 2>/dev/null \
+    | awk -v u="$uid" '$2 == u && $4 != "-" { print $1 }')
+
+if ((${#sessions[@]} == 0)); then
+    exit 0
+fi
+
+active=no
+for session in "${sessions[@]}"; do
+    state="$(loginctl show-session "$session" -p Active --value 2>/dev/null || echo no)"
+    if [[ "$state" == "yes" ]]; then
+        active=yes
+        break
+    fi
+done
+
+audio_ready() {
+    systemctl --user is-active --quiet pipewire-pulse.service \
+        && systemctl --user is-active --quiet wireplumber.service
+}
+
+if [[ "$active" == "yes" ]]; then
+    if audio_ready; then
+        exit 0
+    fi
+
+    systemctl --user start \
+        pipewire.socket \
+        pipewire.service \
+        pipewire-pulse.socket \
+        pipewire-pulse.service \
+        wireplumber.service
+
+    if command -v bluetoothctl >/dev/null; then
+        mapfile -t connected < <(bluetoothctl devices Connected 2>/dev/null | awk '{print $2}')
+        if ((${#connected[@]})); then
+            for mac in "${connected[@]}"; do
+                bluetoothctl disconnect "$mac" >/dev/null 2>&1 || true
+                sleep 0.5
+                bluetoothctl connect "$mac" >/dev/null 2>&1 || true
+            done
+        fi
+    fi
+else
+    if ! systemctl --user is-active --quiet pipewire-pulse.service \
+        && ! systemctl --user is-active --quiet wireplumber.service; then
+        exit 0
+    fi
+
+    # Stop the socket too. Leaving it active respawns pipewire-pulse and
+    # WirePlumber can claim the BlueZ media endpoints again.
+    systemctl --user stop \
+        pipewire-pulse.socket \
+        pipewire-pulse.service \
+        wireplumber.service \
+        || true
+fi

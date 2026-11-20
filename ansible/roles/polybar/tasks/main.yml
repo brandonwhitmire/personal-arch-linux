@@ -6,8 +6,7 @@
   become: true
   ansible.builtin.package:
     name:
-      - polybar  # status bar
-      - pulseaudio  # for volume module
+      - polybar  # status bar; the volume module uses PipeWire's Pulse socket
     state: present
 
 - name: Ensure system polybar config directory exists

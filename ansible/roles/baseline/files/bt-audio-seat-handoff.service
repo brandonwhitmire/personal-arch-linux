@@ -1,0 +1,12 @@
+[Unit]
+Description=Claim or release Bluetooth audio for the active seat session
+After=pipewire.service pipewire-pulse.service wireplumber.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bt-audio-seat-handoff
+RemainAfterExit=no
+
+[Install]
+WantedBy=graphical-session.target

@@ -46,8 +46,8 @@ flameshot &
 # Launch system monitor
 conky --config=/usr/share/conky/conky_theme &
 
-# Start PulseAudio and applet
-start-pulseaudio-x11 &
+# PipeWire user units own audio. Claim Bluetooth only while this seat is active.
+systemctl --user start --no-block bt-audio-seat-handoff.service || true
 pa-applet &
 
 # Set keyboard numlock state

@@ -16,6 +16,8 @@
       - wl-clipboard
       - swaybg
       - redshift
+      - hypridle  # idle lock; Wayland replacement for xss-lock
+      - hyprlock  # screen locker; replacement for i3lock
     state: present
 
 - name: Ensure the desktop portal config directory exists
@@ -77,6 +79,29 @@
     - bar.sh
     - bar-toggle.sh
     - wallpaper.sh
+
+- name: Install the Hyprland idle lock script
+  become: true
+  ansible.builtin.copy:
+    src: idle.sh
+    dest: /usr/local/lib/hypr/idle.sh
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart hypridle
+
+- name: Install the Hyprland idle lock config
+  become: true
+  ansible.builtin.copy:
+    src: '{{ item }}'
+    dest: '/etc/xdg/hypr/{{ item }}'
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - hypridle.conf
+    - hyprlock.conf
+  notify: Restart hypridle
 
 - name: Remove the Polybar wrapper
   become: true

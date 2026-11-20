@@ -22,8 +22,6 @@ while pgrep -x waybar >/dev/null 2>&1; do
     sleep 0.1
 done
 
-pulseaudio --start >/dev/null 2>&1 || true
-
 if [ -f "$cfg" ] && [ -f "$style" ]; then
     waybar -c "$cfg" -s "$style" &
 else

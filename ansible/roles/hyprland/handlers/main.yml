@@ -4,3 +4,9 @@
   ansible.builtin.command: hyprctl reload
   changed_when: false
   failed_when: false
+
+- name: Restart hypridle
+  become: false
+  ansible.builtin.command: hyprctl dispatch 'hl.dsp.exec_cmd("/usr/local/lib/hypr/idle.sh")'
+  changed_when: false
+  failed_when: false

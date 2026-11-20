@@ -353,25 +353,35 @@ borg_backup () {
         --stats \
         --compression auto,lzma \
         --comment "Autobackup: $TODAY" \
+        --exclude-caches \
         --exclude '*.img' \
         --exclude '*.iso' \
         --exclude '*.ova' \
         --exclude '*.vdi' \
         --exclude '*.vmdk' \
-        --exclude '*box' \
-		--exclude '*.qcow2' \
-        --exclude '/home/*/.local' \
-        --exclude '/home/*/.cache' \
-        --exclude '/home/*/.vagrant.d' \
-        --exclude '/home/*/.wine' \
-        --exclude '/home/*/.yarn' \
-        --exclude '/home/*/.npm' \
-        --exclude '/home/*/.gem' \
-        --exclude '/home/*/.config/chromium' \
-        --exclude '/home/*/.cursor' \
-        --exclude '/home/*/.steam' \
-        --exclude '/home/*/.local/share/Steam' \
-        $REPO_BORG::${TODAY}_${EXTRA_TAG} \
+        --exclude '*.qcow2' \
+        --exclude '*.box' \
+        --exclude '*.vbox' \
+        --exclude '*/VirtualBox VMs' \
+        --exclude '*/.cache' \
+        --exclude '*/.vagrant.d' \
+        --exclude '*/.wine' \
+        --exclude '*/.yarn' \
+        --exclude '*/.npm' \
+        --exclude '*/.pyenv' \
+        --exclude '*/.gem' \
+        --exclude '*/.ansible' \
+        --exclude '*/.cursor' \
+        --exclude '*/.config/Cursor' \
+        --exclude '*/.config/BraveSoftware' \
+        --exclude '*/.config/chromium' \
+        --exclude '*/.config/google-chrome' \
+        --exclude '*/.config/mozilla' \
+        --exclude '*/.config/packer' \
+        --exclude '*/.steam' \
+        --exclude '*/.local/share/Steam' \
+        --exclude '*/Games' \
+        "$REPO_BORG::${TODAY}_${EXTRA_TAG}" \
         /etc \
         /home
 
